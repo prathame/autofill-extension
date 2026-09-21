@@ -4,7 +4,7 @@ const LF_BILLING = {
   yearlyLabel: "₹1,499 / year",
   whatsapp: "",
   checkoutUrl: "",
-  licenseServerUrl: "http://127.0.0.1:8788",
+  licenseServerUrl: "https://autofill-extension.onrender.com",
   maxDevices: 1,
   offlineGraceHours: 48,
   signingSecret: "ad13d367f544337856b3861a9d14dd75a060b396ba56f4a4"

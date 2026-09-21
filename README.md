@@ -53,7 +53,7 @@ The first computer that activates **owns** that key. A second computer gets: “
 
 If the seller gets a new laptop, paste their key in the admin page and click **Reset device**. **Revoke** kills the key for everyone.
 
-Keep `licenseServerUrl` in `license-config.js` pointed at this server (local: `http://127.0.0.1:8788`, later your hosted URL).
+Keep `licenseServerUrl` in `license-config.js` pointed at this server (live: `https://autofill-extension.onrender.com`).
 
 Paste that key to the customer. They open ListFill → Upgrade → **Activate**.
 
@@ -73,9 +73,9 @@ Postgres is only used to remember **which keys you issued** and **which computer
    - `DATABASE_URL` = the Neon URI
    - `LICENSE_ADMIN_TOKEN` = a long random string (save this; you need it to issue keys)
    - `MAX_DEVICES` = `1`
-5. After deploy, open `https://YOUR-SERVICE.onrender.com/health` — it should show `"persist":"postgres"`
-6. Issue keys at `https://YOUR-SERVICE.onrender.com/admin/` (paste the admin token)
-7. Put that same `https://YOUR-SERVICE.onrender.com` into `license-config.js` as `licenseServerUrl`, then reload the extension
+5. After deploy, open `https://autofill-extension.onrender.com/health` — it should show `"persist":"postgres"`
+6. Issue keys at `https://autofill-extension.onrender.com/admin/` (paste the admin token)
+7. Keep `licenseServerUrl` in `license-config.js` as `https://autofill-extension.onrender.com`, then reload the extension
 
 ## Publish on the Chrome Web Store
 
