@@ -167,6 +167,7 @@ body {
   background: var(--accent-dim);
   color: var(--accent);
   border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  cursor: pointer;
 }
 
 .brand-sub {
@@ -239,7 +240,7 @@ html.light .icon-sun {
 
 .tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1.1fr 1fr 0.9fr;
   gap: 2px;
   margin-top: 10px;
   padding: 3px;
@@ -685,6 +686,53 @@ html.light .status.bad {
 
 .pin.on {
   color: #d97706;
+}
+
+.profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 14px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.kv:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.kv strong {
+  color: var(--text);
+  font-weight: 650;
+  text-align: right;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  word-break: break-all;
 }
 
 ::-webkit-scrollbar {

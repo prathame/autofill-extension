@@ -65,6 +65,33 @@ function hmac(text) {
   return createHmac("sha256", signingSecret).update(text).digest("hex").slice(0, 20);
 }
 
+function cleanName(value) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+function publicRec(key, rec) {
+  return {
+    key,
+    name: rec.name || "",
+    plan: rec.plan,
+    expiresAt: rec.expiresAt,
+    expires: new Date(rec.expiresAt).toISOString().slice(0, 10),
+    revoked: rec.revoked,
+    deviceCount: (rec.devices || []).length,
+    issuedAt: rec.issuedAt || 0
+  };
+}
+
+function matchKeys(db, query) {
+  const q = String(query || "").trim();
+  if (!q) return [];
+  if (db.keys[q]) return [q];
+  const needle = q.toLowerCase();
+  return Object.entries(db.keys)
+    .filter(([, rec]) => String(rec.name || "").toLowerCase().includes(needle))
+    .map(([key]) => key);
+}
+
 function verifyKey(raw) {
   const key = String(raw || "").trim();
   const parts = key.split(".");
@@ -148,9 +175,12 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/v1/issue") {
       if (!isAdmin(req)) return json(res, 401, { ok: false, error: "Admin token required." });
+      const name = cleanName(body.name);
+      if (!name) return json(res, 400, { ok: false, error: "Enter a customer name." });
       const plan = body.plan || "monthly";
       const issued = mint(plan);
       db.keys[issued.key] = {
+        name,
         plan: issued.plan,
         expiresAt: issued.expiresAt,
         devices: [],
@@ -158,7 +188,12 @@ const server = createServer(async (req, res) => {
         issuedAt: Date.now()
       };
       await saveDb(db);
-      return json(res, 200, { ok: true, ...issued, expires: new Date(issued.expiresAt).toISOString().slice(0, 10) });
+      return json(res, 200, {
+        ok: true,
+        ...issued,
+        name,
+        expires: new Date(issued.expiresAt).toISOString().slice(0, 10)
+      });
     }
 
     if (req.method === "POST" && url.pathname === "/v1/activate") {
@@ -176,7 +211,7 @@ const server = createServer(async (req, res) => {
       if (existing) {
         existing.lastSeen = Date.now();
         await saveDb(db);
-        return json(res, 200, { ok: true, plan: rec.plan, expiresAt: rec.expiresAt });
+        return json(res, 200, { ok: true, plan: rec.plan, expiresAt: rec.expiresAt, name: rec.name || "" });
       }
       if (rec.devices.length >= maxDevices) {
         return json(res, 403, {
@@ -186,7 +221,7 @@ const server = createServer(async (req, res) => {
       }
       rec.devices.push({ id: deviceId, firstSeen: Date.now(), lastSeen: Date.now() });
       await saveDb(db);
-      return json(res, 200, { ok: true, plan: rec.plan, expiresAt: rec.expiresAt });
+      return json(res, 200, { ok: true, plan: rec.plan, expiresAt: rec.expiresAt, name: rec.name || "" });
     }
 
     if (req.method === "POST" && url.pathname === "/v1/check") {
@@ -202,39 +237,49 @@ const server = createServer(async (req, res) => {
       }
       hit.lastSeen = Date.now();
       await saveDb(db);
-      return json(res, 200, { ok: true, plan: rec.plan, expiresAt: rec.expiresAt });
+      return json(res, 200, { ok: true, plan: rec.plan, expiresAt: rec.expiresAt, name: rec.name || "" });
+    }
+
+    if (req.method === "POST" && url.pathname === "/v1/admin/list") {
+      if (!isAdmin(req)) return json(res, 401, { ok: false, error: "Admin token required." });
+      const keys = Object.entries(db.keys)
+        .sort((a, b) => (b[1].issuedAt || 0) - (a[1].issuedAt || 0))
+        .map(([key, rec]) => publicRec(key, rec));
+      return json(res, 200, { ok: true, keys });
     }
 
     if (req.method === "POST" && url.pathname === "/v1/admin/lookup") {
       if (!isAdmin(req)) return json(res, 401, { ok: false, error: "Admin token required." });
-      const rec = db.keys[String(body.key || "").trim()];
-      if (!rec) return json(res, 404, { ok: false, error: "Key not found." });
+      const matches = matchKeys(db, body.key || body.name || body.query);
+      if (!matches.length) return json(res, 404, { ok: false, error: "No customer or key matched." });
       return json(res, 200, {
         ok: true,
-        plan: rec.plan,
-        expiresAt: rec.expiresAt,
-        revoked: rec.revoked,
-        deviceCount: rec.devices.length,
-        devices: rec.devices.map((d) => ({ id: d.id.slice(0, 8) + "…", lastSeen: d.lastSeen }))
+        matches: matches.map((key) => publicRec(key, db.keys[key]))
       });
     }
 
     if (req.method === "POST" && url.pathname === "/v1/admin/reset") {
       if (!isAdmin(req)) return json(res, 401, { ok: false, error: "Admin token required." });
-      const rec = db.keys[String(body.key || "").trim()];
-      if (!rec) return json(res, 404, { ok: false, error: "Key not found." });
-      rec.devices = [];
+      const matches = matchKeys(db, body.key || body.name || body.query);
+      if (!matches.length) return json(res, 404, { ok: false, error: "No customer or key matched." });
+      if (matches.length > 1) {
+        return json(res, 400, { ok: false, error: "Several people matched that name. Paste the full key." });
+      }
+      db.keys[matches[0]].devices = [];
       await saveDb(db);
-      return json(res, 200, { ok: true });
+      return json(res, 200, { ok: true, name: db.keys[matches[0]].name || "" });
     }
 
     if (req.method === "POST" && url.pathname === "/v1/admin/revoke") {
       if (!isAdmin(req)) return json(res, 401, { ok: false, error: "Admin token required." });
-      const rec = db.keys[String(body.key || "").trim()];
-      if (!rec) return json(res, 404, { ok: false, error: "Key not found." });
-      rec.revoked = true;
+      const matches = matchKeys(db, body.key || body.name || body.query);
+      if (!matches.length) return json(res, 404, { ok: false, error: "No customer or key matched." });
+      if (matches.length > 1) {
+        return json(res, 400, { ok: false, error: "Several people matched that name. Paste the full key." });
+      }
+      db.keys[matches[0]].revoked = true;
       await saveDb(db);
-      return json(res, 200, { ok: true });
+      return json(res, 200, { ok: true, name: db.keys[matches[0]].name || "" });
     }
 
     json(res, 404, { ok: false, error: "Not found" });

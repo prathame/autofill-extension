@@ -78,6 +78,11 @@
       const { data } = await api("/v1/check", { key: state.license.key, deviceId: device });
       if (data.ok) {
         state.lastServerOk = Date.now();
+        if (state.license) {
+          if (data.name) state.license.name = data.name;
+          if (data.plan) state.license.plan = data.plan;
+          if (data.expiresAt) state.license.expiresAt = data.expiresAt;
+        }
         await saveState(state);
         return { ok: true };
       }
@@ -91,27 +96,62 @@
     }
   }
 
+  function daysBetween(until) {
+    return Math.max(0, Math.ceil((until - Date.now()) / (24 * 60 * 60 * 1000)));
+  }
+
+  function maskKey(key) {
+    const k = String(key || "");
+    if (k.length < 18) return k || "—";
+    return `${k.slice(0, 14)}…${k.slice(-6)}`;
+  }
+
   async function status() {
     const state = await getState();
     const now = Date.now();
+    const fills = state.fills || 0;
     if (state.license && state.license.expiresAt > now) {
       const live = await confirmDevice(state);
       if (live.ok) {
+        const until = state.license.expiresAt;
         return {
           ok: true,
           plan: "pro",
+          productPlan: state.license.plan || "monthly",
           label: "PRO",
-          until: state.license.expiresAt,
-          license: state.license
+          name: state.license.name || "",
+          until,
+          daysLeft: daysBetween(until),
+          fills,
+          license: state.license,
+          keyMasked: maskKey(state.license.key)
         };
       }
     }
     const end = trialEnds(state);
     if (now < end) {
-      const daysLeft = Math.max(1, Math.ceil((end - now) / (24 * 60 * 60 * 1000)));
-      return { ok: true, plan: "trial", label: "TRIAL", until: end, daysLeft };
+      const daysLeft = Math.max(1, daysBetween(end) || 1);
+      return {
+        ok: true,
+        plan: "trial",
+        productPlan: "trial",
+        label: "TRIAL",
+        name: "",
+        until: end,
+        daysLeft,
+        fills
+      };
     }
-    return { ok: false, plan: "expired", label: "LOCKED", until: end };
+    return {
+      ok: false,
+      plan: "expired",
+      productPlan: "expired",
+      label: "LOCKED",
+      name: "",
+      until: end,
+      daysLeft: 0,
+      fills
+    };
   }
 
   async function activate(rawKey) {
@@ -119,10 +159,12 @@
     if (!parsed) return { ok: false, error: "Invalid license key." };
     if (parsed.expiresAt <= Date.now()) return { ok: false, error: "This license has expired." };
     const device = await deviceId();
+    let issuedName = "";
     if (serverUrl()) {
       try {
         const { data } = await api("/v1/activate", { key: parsed.key, deviceId: device });
         if (!data.ok) return { ok: false, error: data.error || "Could not activate this key." };
+        issuedName = data.name || "";
       } catch {
         return { ok: false, error: "License server is not running. Start it before activating." };
       }
@@ -131,6 +173,7 @@
     state.license = {
       key: parsed.key,
       plan: parsed.plan,
+      name: issuedName,
       expiresAt: parsed.expiresAt,
       activatedAt: Date.now(),
       deviceId: device

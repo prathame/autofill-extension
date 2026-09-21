@@ -20,7 +20,7 @@
             <div>
               <div class="brand-name">
                 ListFill
-                <span id="plan-badge" class="pro">TRIAL</span>
+                <span id="plan-badge" class="pro" title="Open account">TRIAL</span>
               </div>
               <p class="brand-sub">Configure once · Autofill every listing</p>
             </div>
@@ -40,11 +40,12 @@
         </div>
         <nav class="tabs" aria-label="Preset navigation">
           <button id="tab-home" class="tab" type="button">
-            Saved Variants <span id="variant-count" class="count">0</span>
+            Variants <span id="variant-count" class="count">0</span>
           </button>
           <button id="tab-editor" class="tab tab-on" type="button">
-            <span class="dot"></span> Active Preset
+            <span class="dot"></span> Preset
           </button>
+          <button id="tab-account" class="tab" type="button">Account</button>
         </nav>
       </header>
 
@@ -137,6 +138,27 @@
           </div>
           <div id="field-list" class="stack"></div>
         </section>
+
+        <section id="view-account" class="view hidden">
+          <section class="card profile-hero">
+            <div id="profile-initials" class="profile-avatar">LF</div>
+            <div>
+              <div id="profile-name" class="brand-name">Your account</div>
+              <p id="profile-status" class="brand-sub">Checking subscription…</p>
+            </div>
+          </section>
+          <section class="card">
+            <p class="section-label">Subscription</p>
+            <div class="kv"><span>Status</span><strong id="profile-label">—</strong></div>
+            <div class="kv"><span>Plan</span><strong id="profile-plan">—</strong></div>
+            <div class="kv"><span>Valid until</span><strong id="profile-until">—</strong></div>
+            <div class="kv"><span>Time left</span><strong id="profile-left">—</strong></div>
+            <div class="kv"><span>Autofills used</span><strong id="profile-fills">0</strong></div>
+            <div class="kv"><span>License</span><strong id="profile-key" class="mono">—</strong></div>
+          </section>
+          <button id="btn-profile-upgrade" class="btn-glow" type="button">Upgrade to Pro</button>
+          <button id="btn-profile-key" class="btn-ghost" type="button">Activate or change license key</button>
+        </section>
       </div>
 
       <footer class="ftr">
@@ -157,7 +179,7 @@
             <button id="btn-import" class="link" type="button">Import</button>
             <input id="import-file" type="file" accept="application/json" hidden />
           </div>
-          <span class="ver">v1.1.1 · Safe local storage</span>
+          <span class="ver">v1.2.0 · Safe local storage</span>
         </div>
         <p class="disclaimer">Independent supplier assistant. All form data stays in your browser. You still submit the catalog yourself.</p>
       </footer>

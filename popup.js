@@ -18,10 +18,73 @@ const KIND_LABEL = {
 function show(id) {
   $("view-home").classList.toggle("hidden", id !== "home");
   $("view-editor").classList.toggle("hidden", id !== "editor");
+  $("view-account").classList.toggle("hidden", id !== "account");
   $("tab-home").classList.toggle("tab-on", id === "home");
   $("tab-editor").classList.toggle("tab-on", id === "editor");
+  $("tab-account").classList.toggle("tab-on", id === "account");
   $("btn-fill-current").classList.toggle("hidden", id !== "editor");
   $("btn-save").classList.toggle("hidden", id !== "editor");
+}
+
+function planTitle(plan) {
+  return (
+    {
+      monthly: "Monthly",
+      yearly: "Yearly",
+      lifetime: "Lifetime",
+      trial: "Free trial",
+      expired: "Expired"
+    }[plan] || plan || "—"
+  );
+}
+
+function fmtDate(ms) {
+  if (!ms) return "—";
+  return new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+function initialsFrom(name) {
+  const parts = String(name || "LF")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "LF";
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0].toUpperCase())
+    .join("");
+}
+
+function renderProfile(access) {
+  const name = access.name || (access.plan === "pro" ? "Pro member" : "You");
+  $("profile-name").textContent = name;
+  $("profile-initials").textContent = initialsFrom(name);
+  $("profile-label").textContent = access.label || "—";
+  $("profile-plan").textContent = planTitle(access.productPlan || access.plan);
+  $("profile-until").textContent = fmtDate(access.until);
+  $("profile-left").textContent =
+    access.plan === "expired"
+      ? "Ended"
+      : access.daysLeft === 1
+        ? "1 day"
+        : `${access.daysLeft || 0} days`;
+  $("profile-fills").textContent = String(access.fills || 0);
+  $("profile-key").textContent = access.keyMasked || "No key on this computer";
+  if (access.plan === "pro") {
+    $("profile-status").textContent = "Pro · this computer is licensed";
+    $("btn-profile-upgrade").classList.add("hidden");
+    $("btn-profile-key").textContent = "Replace license key";
+  } else if (access.plan === "trial") {
+    $("profile-status").textContent = `${access.daysLeft} day${access.daysLeft === 1 ? "" : "s"} left in free trial`;
+    $("btn-profile-upgrade").classList.remove("hidden");
+    $("btn-profile-upgrade").textContent = "Upgrade to Pro";
+    $("btn-profile-key").textContent = "I already have a key";
+  } else {
+    $("profile-status").textContent = "Trial ended · Autofill is locked";
+    $("btn-profile-upgrade").classList.remove("hidden");
+    $("btn-profile-upgrade").textContent = "Subscribe";
+    $("btn-profile-key").textContent = "Activate license key";
+  }
 }
 
 function status(text, bad) {
@@ -56,6 +119,7 @@ async function refreshPlanUI() {
   const pay = $("btn-pay");
   const banner = $("plan-banner");
   if (badge) badge.textContent = access.label;
+  renderProfile(access);
   if (price) price.textContent = LF_BILLING.priceLabel;
   if (year) year.textContent = LF_BILLING.yearlyLabel || "";
   const url = payUrl();
@@ -510,6 +574,18 @@ $("tab-editor").addEventListener("click", async () => {
   if (!draft) await openEditor();
   else show("editor");
 });
+$("tab-account").addEventListener("click", async () => {
+  await persistDraft();
+  show("account");
+  await refreshPlanUI();
+});
+$("plan-badge").addEventListener("click", async () => {
+  await persistDraft();
+  show("account");
+  await refreshPlanUI();
+});
+$("btn-profile-upgrade").addEventListener("click", () => $("paywall").classList.remove("hidden"));
+$("btn-profile-key").addEventListener("click", () => $("paywall").classList.remove("hidden"));
 $("btn-new").addEventListener("click", async () => {
   draft = LF.emptyVariant();
   await LF.saveDraft(draft);

@@ -47,6 +47,8 @@
         <input id="token" class="input" type="password" placeholder="Printed when the server starts" />
         <p id="health" class="warn"></p>
 
+        <label class="tiny" for="name">Customer name</label>
+        <input id="name" class="input" type="text" placeholder="e.g. Ravi Stores" maxlength="80" />
         <label class="tiny" for="plan">Plan</label>
         <select id="plan" class="input">
           <option value="monthly">Monthly · 31 days</option>
@@ -63,8 +65,8 @@
       </section>
 
       <section class="card" style="margin-top: 14px">
-        <p class="section-label">Look up / reset a key</p>
-        <input id="lookup-key" class="input" type="text" placeholder="Paste a customer key" />
+        <p class="section-label">Look up / reset</p>
+        <input id="lookup-key" class="input" type="text" placeholder="Customer name or paste a key" />
         <div class="row-end">
           <button id="lookup" class="btn-ghost sm-btn" type="button">Look up</button>
           <button id="reset" class="btn-ghost sm-btn" type="button">Reset device</button>
@@ -73,7 +75,7 @@
         <p id="lookup-out" class="warn"></p>
       </section>
 
-      <p class="section-label" style="margin: 18px 0 8px">Issued on this computer</p>
+      <p class="section-label" style="margin: 18px 0 8px">Issued keys</p>
       <ul id="history" class="history"></ul>
     </div>
     <script>
@@ -112,36 +114,59 @@
         }
       }
 
-      function loadHistory() {
-        try { return JSON.parse(localStorage.getItem("lf_issued_keys") || "[]"); } catch { return []; }
+      function esc(s) {
+        return String(s || "").replace(/[&<>"']/g, (c) => ({
+          "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        }[c]));
       }
-      function saveHistory(list) {
-        localStorage.setItem("lf_issued_keys", JSON.stringify(list.slice(0, 50)));
+
+      function rowHtml(row) {
+        const who = row.name ? esc(row.name) : "Unnamed";
+        const status = row.revoked ? "REVOKED" : (row.deviceCount ? `${row.deviceCount} device` : "not activated");
+        return `<li data-key="${esc(row.key)}"><strong>${who}</strong> · ${esc(row.plan)} · expires ${esc(row.expires)} · ${status}<code>${esc(row.key)}</code></li>`;
       }
-      function renderHistory() {
-        const list = loadHistory();
-        $("history").innerHTML = list.length
-          ? list.map((row) => `<li><strong>${row.plan}</strong> · expires ${row.expires}<code>${row.key}</code></li>`).join("")
-          : `<li class="muted">No keys issued yet.</li>`;
+
+      function describe(row) {
+        const who = row.name || "Unnamed";
+        return `${who} · ${row.plan} · expires ${row.expires} · ${row.revoked ? "REVOKED" : row.deviceCount + " device"}`;
       }
+
+      async function refreshList() {
+        try {
+          const data = await admin("/v1/admin/list", {});
+          if (!data.ok) {
+            $("history").innerHTML = `<li class="muted">${esc(data.error || "Could not load keys")}</li>`;
+            return;
+          }
+          $("history").innerHTML = data.keys.length
+            ? data.keys.map(rowHtml).join("")
+            : `<li class="muted">No keys issued yet.</li>`;
+        } catch {
+          $("history").innerHTML = `<li class="muted">Paste the admin token to load named keys.</li>`;
+        }
+      }
+
+      $("history").addEventListener("click", (ev) => {
+        const li = ev.target.closest("li[data-key]");
+        if (!li) return;
+        $("lookup-key").value = li.getAttribute("data-key");
+      });
 
       $("issue").addEventListener("click", async () => {
         $("issue-msg").textContent = "";
         try {
-          const data = await admin("/v1/issue", { plan: $("plan").value });
+          const data = await admin("/v1/issue", { plan: $("plan").value, name: $("name").value });
           if (!data.ok) {
-            $("issue-msg").innerHTML = `<span class="err">${data.error || "Issue failed"}</span>`;
+            $("issue-msg").innerHTML = `<span class="err">${esc(data.error || "Issue failed")}</span>`;
             return;
           }
           $("out").classList.remove("hidden");
           $("key").textContent = data.key;
-          $("expires").textContent = "Expires " + data.expires + " · bound to first computer that activates";
-          const hist = loadHistory();
-          hist.unshift({ plan: data.plan, key: data.key, expires: data.expires, at: Date.now() });
-          saveHistory(hist);
-          renderHistory();
+          $("expires").textContent = `${data.name} · expires ${data.expires} · bound to first computer that activates`;
+          $("name").value = "";
+          refreshList();
         } catch {
-          $("issue-msg").innerHTML = `<span class="err">Cannot reach server. Start it with node server/license-server.mjs</span>`;
+          $("issue-msg").innerHTML = `<span class="err">Cannot reach server. Check the Render URL and admin token.</span>`;
         }
       });
 
@@ -154,21 +179,30 @@
       });
 
       $("lookup").addEventListener("click", async () => {
-        const data = await admin("/v1/admin/lookup", { key: $("lookup-key").value.trim() });
-        $("lookup-out").textContent = data.ok
-          ? `${data.plan} · ${data.deviceCount} device · ${data.revoked ? "REVOKED" : "active"}`
-          : data.error || "Not found";
+        const data = await admin("/v1/admin/lookup", { query: $("lookup-key").value.trim() });
+        if (!data.ok) {
+          $("lookup-out").textContent = data.error || "Not found";
+          return;
+        }
+        $("lookup-out").innerHTML = data.matches.map((row) => esc(describe(row))).join("<br>");
+        if (data.matches.length === 1) $("lookup-key").value = data.matches[0].key;
       });
       $("reset").addEventListener("click", async () => {
-        const data = await admin("/v1/admin/reset", { key: $("lookup-key").value.trim() });
-        $("lookup-out").textContent = data.ok ? "Device reset. Customer can activate on a new computer." : data.error;
+        const data = await admin("/v1/admin/reset", { query: $("lookup-key").value.trim() });
+        $("lookup-out").textContent = data.ok
+          ? `Device reset for ${data.name || "this key"}. They can activate on a new computer.`
+          : data.error;
+        if (data.ok) refreshList();
       });
       $("revoke").addEventListener("click", async () => {
-        const data = await admin("/v1/admin/revoke", { key: $("lookup-key").value.trim() });
-        $("lookup-out").textContent = data.ok ? "Key revoked. It will not work on any computer." : data.error;
+        const data = await admin("/v1/admin/revoke", { query: $("lookup-key").value.trim() });
+        $("lookup-out").textContent = data.ok
+          ? `Key revoked for ${data.name || "this customer"}.`
+          : data.error;
+        if (data.ok) refreshList();
       });
 
-      renderHistory();
+      refreshList();
       ping();
     </script>
   </body>

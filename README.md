@@ -46,8 +46,11 @@ node server/license-server.mjs
 Copy the **admin token** it prints. Then open [http://127.0.0.1:8787/admin/](http://127.0.0.1:8787/admin/) (also run `python3 -m http.server 8787` if needed).
 
 1. Paste the admin token
-2. Pick Monthly / Yearly / Lifetime → **Issue key** → **Copy key**
-3. Customer pastes it in ListFill → Activate
+2. Type the **customer name** (shop / person)
+3. Pick Monthly / Yearly / Lifetime → **Issue key** → **Copy key**
+4. Customer pastes it in ListFill → Activate
+
+Look up later by **name** or by key. Click a row in the issued list to copy that key into lookup.
 
 The first computer that activates **owns** that key. A second computer gets: “already active on another computer.”
 
