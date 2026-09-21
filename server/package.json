@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server/license-server.mjs"
+    "start": "node license-server.mjs"
   },
   "engines": {
     "node": ">=18"

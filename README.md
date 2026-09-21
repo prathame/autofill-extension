@@ -8,7 +8,7 @@ This is not affiliated with Meesho.
 
 1. Open `chrome://extensions`
 2. Enable **Developer mode**
-3. Click **Load unpacked** and select this folder
+3. Click **Load unpacked** and select this folder (the one with `manifest.json`, not `node_modules`)
 4. Pin **ListFill for Meesho**
 
 Practice page: `python3 -m http.server 8787` then open http://127.0.0.1:8787/demo/
@@ -65,8 +65,8 @@ Postgres is only used to remember **which keys you issued** and **which computer
 2. Dashboard → **Connect** → copy the **pooled** URI (host contains `-pooler`)
 3. On Render: **New → Web Service** → connect `prathame/autofill-extension`
    - Runtime: Node
-   - Build: `npm install`
-   - Start: `npm start`
+   - Build: `npm install --prefix server`
+   - Start: `node server/license-server.mjs`
    - Instance: **Free**
    - Health check: `/health`
 4. Environment:
