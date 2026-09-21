@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ListFill - Smart Listing Autofill Assistant</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="hdr">
+        <div class="hdr-row">
+          <div class="brand">
+            <div class="brand-mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m5 12 5 5L20 7"></path>
+                <path d="M12 20h8"></path>
+              </svg>
+            </div>
+            <div>
+              <div class="brand-name">
+                ListFill
+                <span id="plan-badge" class="pro">TRIAL</span>
+              </div>
+              <p class="brand-sub">Configure once · Autofill every listing</p>
+            </div>
+          </div>
+          <div class="hdr-actions">
+            <div id="page-pill" class="ready">Checking…</div>
+            <button id="theme-toggle" class="icon-btn" type="button" title="Switch theme" aria-label="Toggle theme">
+              <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+              <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="5"></circle>
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <nav class="tabs" aria-label="Preset navigation">
+          <button id="tab-home" class="tab" type="button">
+            Saved Variants <span id="variant-count" class="count">0</span>
+          </button>
+          <button id="tab-editor" class="tab tab-on" type="button">
+            <span class="dot"></span> Active Preset
+          </button>
+        </nav>
+      </header>
+
+      <div class="body">
+        <section id="view-home" class="view hidden">
+          <div class="row-between">
+            <span class="section-label">Your variants</span>
+            <button id="btn-new" class="btn-mini" type="button">+ New variant</button>
+          </div>
+          <div id="variant-list" class="stack"></div>
+        </section>
+
+        <section id="view-editor" class="view">
+          <section class="card">
+            <div class="label-row">
+              <label for="draft-name">Variant / Preset Name</label>
+              <span id="draft-id" class="mono muted">ID: —</span>
+            </div>
+            <input id="draft-name" class="input" type="text" placeholder="e.g., Casual Shirt Blue" />
+
+            <div class="divider">
+              <div class="label-row">
+                <label class="check">
+                  <input id="sku-enabled" type="checkbox" />
+                  <span>Auto-increment SKU ID</span>
+                </label>
+                <span id="sku-preview" class="badge hidden">Next: —</span>
+              </div>
+              <div id="sku-row" class="sku-grid hidden">
+                <div>
+                  <span class="tiny">Prefix</span>
+                  <input id="sku-prefix" class="input sm" type="text" placeholder="floral" />
+                </div>
+                <div>
+                  <span class="tiny">Counter</span>
+                  <input id="sku-next" class="input sm center" type="number" min="1" value="1" />
+                </div>
+              </div>
+              <div class="label-row">
+                <label class="check">
+                  <input id="style-enabled" type="checkbox" />
+                  <span class="soft">Auto-increment Style Code / Prod ID</span>
+                </label>
+                <span id="style-preview" class="muted tiny hidden">Disabled</span>
+              </div>
+              <div id="style-row" class="sku-grid hidden">
+                <div>
+                  <span class="tiny">Prefix</span>
+                  <input id="style-prefix" class="input sm" type="text" />
+                </div>
+                <div>
+                  <span class="tiny">Counter</span>
+                  <input id="style-next" class="input sm center" type="number" min="1" value="1" />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <button id="btn-capture" class="btn-glow" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+            Pick fields on live page
+          </button>
+          <p class="hint-center">The popup closes into a floating panel so you can tap form inputs on the listing page.</p>
+          <button id="btn-stop-capture" class="btn-danger hidden" type="button">Stop capture</button>
+          <button id="btn-hide-popup" class="btn-ghost hidden" type="button">Hide popup — click the form</button>
+          <button id="btn-add-manual" class="btn-ghost" type="button">+ Add field manually</button>
+
+          <div id="manual-box" class="card hidden">
+            <input id="manual-label" class="input" type="text" placeholder="Label, e.g. GST" />
+            <input id="manual-value" class="input" type="text" placeholder="Value, e.g. 18%" />
+            <select id="manual-kind" class="input">
+              <option value="text">Text</option>
+              <option value="textarea">Long text</option>
+              <option value="select">Dropdown</option>
+              <option value="size">Size / pill</option>
+              <option value="checkbox">Checkbox</option>
+              <option value="sku">SKU ID</option>
+              <option value="styleCode">Style code</option>
+            </select>
+            <div class="row-end">
+              <button id="manual-cancel" class="btn-ghost sm-btn" type="button">Cancel</button>
+              <button id="manual-save" class="btn-save sm-btn" type="button">Add</button>
+            </div>
+          </div>
+
+          <div class="label-row">
+            <span class="section-label">Captured Fields <span id="field-count" class="count">0</span></span>
+          </div>
+          <div id="field-list" class="stack"></div>
+        </section>
+      </div>
+
+      <footer class="ftr">
+        <div id="plan-banner" class="plan-banner hidden"></div>
+        <div class="ftr-actions">
+          <button id="btn-fill-current" class="btn-glow flex" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+            Autofill Meesho Page
+          </button>
+          <button id="btn-save" class="btn-save" type="button">Save</button>
+        </div>
+        <div class="ftr-utils">
+          <div>
+            <button id="btn-export" class="link" type="button">Export</button>
+            <span class="sep">|</span>
+            <button id="btn-import" class="link" type="button">Import</button>
+            <input id="import-file" type="file" accept="application/json" hidden />
+          </div>
+          <span class="ver">v1.1.1 · Safe local storage</span>
+        </div>
+        <p class="disclaimer">Independent supplier assistant. All form data stays in your browser. You still submit the catalog yourself.</p>
+      </footer>
+    </div>
+    <div id="paywall" class="paywall hidden">
+      <div class="paywall-card">
+        <h2>Continue with ListFill Pro</h2>
+        <p class="hint-center">Install is free. After the 5-day trial, Autofill needs a subscription. Capture and saved variants stay on this computer.</p>
+        <p id="pay-price" class="price">₹199 / month</p>
+        <p id="pay-year" class="muted tiny">₹1,499 / year</p>
+        <a id="btn-pay" class="btn-glow" href="#" target="_blank" rel="noopener">Pay &amp; get license</a>
+        <p class="hint-center">After payment you receive a key. Paste it below.</p>
+        <input id="license-key" class="input" type="text" placeholder="LF1.monthly.……" />
+        <div class="row-end">
+          <button id="paywall-close" class="btn-ghost sm-btn" type="button">Not now</button>
+          <button id="btn-activate" class="btn-save sm-btn" type="button">Activate</button>
+        </div>
+      </div>
+    </div>
+    <div id="status" class="status hidden"></div>
+    <script src="shared.js"></script>
+    <script src="license-config.js"></script>
+    <script src="src/license.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

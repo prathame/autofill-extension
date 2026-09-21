@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Add Product · Meesho demo</title>
+    <style>
+      :root {
+        --pink: #f43397;
+        --ink: #1a1a1a;
+        --muted: #6b7280;
+        --line: #e5e7eb;
+        --bg: #f6f7fb;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+      }
+      header {
+        background: #fff;
+        border-bottom: 1px solid var(--line);
+        padding: 14px 28px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      header b { color: var(--pink); }
+      main {
+        max-width: 920px;
+        margin: 24px auto 80px;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 24px 28px 32px;
+      }
+      h1 { margin: 0 0 6px; font-size: 22px; }
+      .sub { color: var(--muted); margin-bottom: 22px; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .span-2 { grid-column: span 2; }
+      label.field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 600;
+      }
+      input, textarea, select {
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font: 14px "Segoe UI", system-ui, sans-serif;
+      }
+      .combo { position: relative; }
+      .combo [role="listbox"] {
+        display: none;
+        position: absolute;
+        left: 0; right: 0; top: 100%;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        z-index: 5;
+      }
+      .combo.open [role="listbox"] { display: block; }
+      [role="option"] { padding: 8px 12px; cursor: pointer; }
+      [role="option"]:hover { background: #fce7f3; }
+      .sizes { display: flex; gap: 8px; flex-wrap: wrap; }
+      .chip {
+        border: 1px solid #d1d5db;
+        background: #fff;
+        border-radius: 999px;
+        padding: 8px 14px;
+        cursor: pointer;
+      }
+      .chip.selected { border-color: var(--pink); background: #fce7f3; color: var(--pink); font-weight: 700; }
+      table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+      th, td { border: 1px solid var(--line); padding: 8px; text-align: left; font-size: 13px; }
+      th { background: #fafafa; }
+      table input { width: 100%; }
+      .check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); font-weight: 500; }
+      .photos { display: flex; gap: 10px; }
+      .photo {
+        width: 88px; height: 88px; border: 1px dashed #d1d5db; border-radius: 8px;
+        display: grid; place-items: center; color: var(--muted); font-size: 12px; background: #fafafa;
+      }
+      .submit {
+        margin-top: 22px;
+        background: var(--pink);
+        color: #fff;
+        border: 0;
+        border-radius: 8px;
+        padding: 12px 18px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .note {
+        margin-top: 18px;
+        padding: 12px 14px;
+        background: #f0fdf8;
+        border: 1px solid #bbf7d0;
+        border-radius: 8px;
+        color: #14532d;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div><b>supplier.meesho</b> · demo catalog form</div>
+      <span>Single upload</span>
+    </header>
+    <main>
+      <h1>Add Product</h1>
+      <p class="sub">Practice page for ListFill. Category is already selected. Size unlocks price, MRP, inventory and SKU rows — same order as the real supplier panel.</p>
+
+      <p class="lbl" style="font-size:12px;color:#6b7280;font-weight:600;margin:0 0 8px">Product photos</p>
+      <div class="photos">
+        <div class="photo">Front</div>
+        <div class="photo">+ Add</div>
+      </div>
+
+      <div class="grid" style="margin-top:20px">
+        <label class="field">Product Name
+          <input id="product-name" name="productName" type="text" placeholder="Enter product name" />
+        </label>
+        <label class="field">Brand
+          <input id="brand" name="brand" type="text" placeholder="Brand / addon" />
+        </label>
+        <div class="span-2">
+          <div class="field">Size</div>
+          <div class="sizes" role="group" aria-label="Size">
+            <button type="button" class="chip" data-size="50ml">50ml</button>
+            <button type="button" class="chip" data-size="100ml">100ml</button>
+            <button type="button" class="chip" data-size="200ml">200ml</button>
+          </div>
+          <div id="size-grid"></div>
+        </div>
+        <label class="field">GST
+          <div class="combo">
+            <input id="gst" name="gst" role="combobox" aria-label="GST" placeholder="Select GST" autocomplete="off" />
+            <div role="listbox">
+              <div role="option">5%</div>
+              <div role="option">12%</div>
+              <div role="option">18%</div>
+            </div>
+          </div>
+        </label>
+        <label class="field">HSN Code
+          <input id="hsn" name="hsn" type="text" placeholder="HSN" />
+        </label>
+        <label class="field">Net Weight
+          <input id="weight" name="weight" type="text" placeholder="e.g. 100" />
+        </label>
+        <label class="field">Country of Origin
+          <select id="origin" name="origin" aria-label="Country of Origin">
+            <option value="">Select</option>
+            <option>India</option>
+            <option>China</option>
+            <option>Other</option>
+          </select>
+        </label>
+        <label class="field">Manufacturer Name
+          <input id="mfg-name" name="manufacturerName" type="text" />
+        </label>
+        <label class="field">Manufacturer Address
+          <input id="mfg-address" name="manufacturerAddress" type="text" />
+        </label>
+        <label class="check span-2">
+          <input id="same-mfg" type="checkbox" />
+          Same as manufacturer details
+        </label>
+        <label class="field span-2">Description
+          <textarea id="description" name="description" rows="4" placeholder="Product description"></textarea>
+        </label>
+      </div>
+      <button class="submit" type="button" id="submit">Submit catalog</button>
+      <p class="note">Load the ListFill extension, open this page, create a variant, click fields on the page (Size first), save, then Autofill on a fresh reload.</p>
+    </main>
+    <script>
+      const grid = document.getElementById("size-grid");
+      const selected = new Set();
+
+      function row(size) {
+        const sid = size.replace(/\W/g, "");
+        return `<tr>
+          <td>${size}</td>
+          <td><label>Price<input aria-label="Price ${size}" name="price-${sid}" /></label></td>
+          <td><label>MRP<input aria-label="MRP ${size}" name="mrp-${sid}" /></label></td>
+          <td><label>Inventory<input aria-label="Inventory ${size}" name="inventory-${sid}" /></label></td>
+          <td><label>SKU ID<input aria-label="SKU ID ${size}" name="sku-${sid}" /></label></td>
+        </tr>`;
+      }
+
+      function renderGrid() {
+        if (!selected.size) {
+          grid.innerHTML = "";
+          return;
+        }
+        grid.innerHTML = `<table>
+          <thead><tr><th>Size</th><th>Price</th><th>MRP</th><th>Inventory</th><th>SKU ID</th></tr></thead>
+          <tbody>${[...selected].map(row).join("")}</tbody>
+        </table>`;
+      }
+
+      document.querySelectorAll(".chip").forEach((chip) => {
+        chip.addEventListener("click", () => {
+          const size = chip.dataset.size;
+          if (selected.has(size)) selected.delete(size);
+          else selected.add(size);
+          chip.classList.toggle("selected", selected.has(size));
+          renderGrid();
+        });
+      });
+
+      const combo = document.querySelector(".combo");
+      const gst = document.getElementById("gst");
+      gst.addEventListener("focus", () => combo.classList.add("open"));
+      gst.addEventListener("click", () => combo.classList.add("open"));
+      combo.querySelectorAll("[role=option]").forEach((opt) => {
+        opt.addEventListener("click", () => {
+          gst.value = opt.textContent.trim();
+          gst.dispatchEvent(new Event("input", { bubbles: true }));
+          gst.dispatchEvent(new Event("change", { bubbles: true }));
+          combo.classList.remove("open");
+        });
+      });
+      document.addEventListener("click", (e) => {
+        if (!combo.contains(e.target)) combo.classList.remove("open");
+      });
+
+      document.getElementById("submit").addEventListener("click", () => {
+        alert("Demo only — nothing is submitted. Review the filled values, then use the real supplier panel for live catalogs.");
+      });
+
+      if (new URLSearchParams(location.search).has("test")) {
+        window.chrome = {
+          storage: {
+            local: {
+              get: async (key) => (typeof key === "string" ? { [key]: undefined } : {}),
+              set: async () => {}
+            }
+          },
+          runtime: { sendMessage: async () => {}, onMessage: { addListener() {} } }
+        };
+        const load = (src) =>
+          new Promise((resolve, reject) => {
+            const s = document.createElement("script");
+            s.src = src;
+            s.onload = resolve;
+            s.onerror = reject;
+            document.body.appendChild(s);
+          });
+        (async () => {
+          await load("../shared.js");
+          await load("../src/locator.js");
+          await load("../src/fill.js");
+          const variant = {
+            sku: { enabled: true, prefix: "neoflora", next: 12 },
+            styleCode: { enabled: false },
+            fields: [
+              { label: "Size", kind: "size", value: "100ml", locator: { label: "Size", strategies: [{ type: "label", value: "Size" }] } },
+              { label: "Product Name", kind: "text", value: "Floral perfume", locator: { label: "Product Name", strategies: [{ type: "label", value: "Product Name" }] } },
+              { label: "Brand", kind: "text", value: "Neoflora", locator: { label: "Brand", strategies: [{ type: "label", value: "Brand" }] } },
+              { label: "GST", kind: "select", value: "18%", locator: { label: "GST", strategies: [{ type: "label", value: "GST" }] } },
+              { label: "HSN Code", kind: "text", value: "3303", locator: { label: "HSN Code", strategies: [{ type: "label", value: "HSN Code" }] } },
+              { label: "Net Weight", kind: "text", value: "100", locator: { label: "Net Weight", strategies: [{ type: "label", value: "Net Weight" }] } },
+              { label: "Country of Origin", kind: "select", value: "India", locator: { label: "Country of Origin", strategies: [{ type: "label", value: "Country of Origin" }] } },
+              { label: "Manufacturer Name", kind: "text", value: "Demo Mfg", locator: { label: "Manufacturer Name", strategies: [{ type: "label", value: "Manufacturer Name" }] } },
+              { label: "Manufacturer Address", kind: "text", value: "Surat", locator: { label: "Manufacturer Address", strategies: [{ type: "label", value: "Manufacturer Address" }] } },
+              { label: "Description", kind: "textarea", value: "Long lasting floral perfume.", locator: { label: "Description", strategies: [{ type: "label", value: "Description" }] } },
+              { label: "Price 100ml", kind: "text", value: "199", locator: { label: "Price 100ml", strategies: [{ type: "label", value: "Price 100ml" }] } },
+              { label: "MRP 100ml", kind: "text", value: "399", locator: { label: "MRP 100ml", strategies: [{ type: "label", value: "MRP 100ml" }] } },
+              { label: "Inventory 100ml", kind: "text", value: "50", locator: { label: "Inventory 100ml", strategies: [{ type: "label", value: "Inventory 100ml" }] } },
+              { label: "SKU ID 100ml", kind: "sku", value: "ignored", locator: { label: "SKU ID 100ml", strategies: [{ type: "label", value: "SKU ID 100ml" }] } }
+            ]
+          };
+          const results = await LFFill.runFill(variant);
+          const expect = {
+            "product-name": "Floral perfume",
+            brand: "Neoflora",
+            gst: "18%",
+            hsn: "3303",
+            weight: "100",
+            origin: "India",
+            "mfg-name": "Demo Mfg",
+            "mfg-address": "Surat",
+            description: "Long lasting floral perfume."
+          };
+          const misses = [];
+          Object.entries(expect).forEach(([id, want]) => {
+            const el = document.getElementById(id);
+            const got = el.tagName === "SELECT" ? el.selectedOptions[0]?.text.trim() : el.value;
+            if (got !== want) misses.push(`${id}: got "${got}" want "${want}"`);
+          });
+          const sku = document.querySelector('[name="sku-100ml"]');
+          if (!sku || sku.value !== "neoflora12") misses.push(`sku: got "${sku && sku.value}"`);
+          const price = document.querySelector('[name="price-100ml"]');
+          if (!price || price.value !== "199") misses.push(`price: got "${price && price.value}"`);
+          const banner = document.createElement("pre");
+          banner.style.cssText = "margin-top:16px;padding:12px;border-radius:8px;white-space:pre-wrap;";
+          if (misses.length) {
+            banner.style.background = "#fee2e2";
+            banner.textContent = "TEST FAIL\n" + JSON.stringify(results, null, 2) + "\n" + misses.join("\n");
+          } else {
+            banner.style.background = "#dcfce7";
+            banner.textContent = `TEST PASS — filled ${results.filled} fields`;
+          }
+          document.querySelector("main").appendChild(banner);
+        })();
+      }
+    </script>
+  </body>
+</html>

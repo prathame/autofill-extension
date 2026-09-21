@@ -1,0 +1,223 @@
+#listfill-root,
+.listfill-root {
+  all: initial;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.listfill-root * {
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.lf-ring {
+  position: absolute;
+  z-index: 2147483000;
+  pointer-events: none;
+  border: 2px solid #1d9e75;
+  background: rgba(29, 158, 117, 0.12);
+  border-radius: 8px;
+  display: none;
+}
+
+.lf-banner,
+.lf-progress,
+.lf-toast,
+.lf-dialog,
+.lf-panel {
+  position: fixed;
+  z-index: 2147483646;
+  color: #eef2f7;
+  background: #121a2b;
+  border: 1px solid #243049;
+}
+
+.lf-panel {
+  top: 72px;
+  left: 12px;
+  width: 280px;
+  max-height: calc(100vh - 96px);
+  overflow: auto;
+  padding: 0;
+  border-radius: 12px;
+}
+
+.lf-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: grab;
+  user-select: none;
+  border-bottom: 1px solid #243049;
+}
+
+.lf-panel-head:active {
+  cursor: grabbing;
+}
+
+.lf-panel-hint {
+  font-size: 11px;
+  color: #93a0b5;
+}
+
+.lf-panel .lf-banner-count {
+  display: block;
+  padding: 8px 12px 4px;
+}
+
+.lf-panel-fields {
+  padding: 4px 12px;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.lf-panel-row {
+  font-size: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #1c2740;
+}
+
+.lf-panel-row b {
+  display: block;
+  color: #eef2f7;
+}
+
+.lf-panel-row span {
+  color: #93a0b5;
+  word-break: break-word;
+}
+
+.lf-panel-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px 12px;
+}
+
+.lf-panel-actions .lf-btn {
+  flex: 1;
+}
+
+.lf-progress {
+  top: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  min-width: 280px;
+  max-width: 360px;
+}
+
+.lf-banner-copy,
+.lf-progress-copy {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.lf-banner-copy strong,
+.lf-progress-copy {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.lf-banner-count {
+  color: #93a0b5;
+  font-size: 12px;
+}
+
+.lf-dialog {
+  position: absolute;
+  width: 320px;
+  padding: 14px;
+  border-radius: 12px;
+  z-index: 2147483647;
+}
+
+.lf-dialog-h {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.lf-dialog label {
+  display: block;
+  font-size: 11px;
+  color: #93a0b5;
+  margin: 8px 0 4px;
+}
+
+.lf-input {
+  width: 100%;
+  border: 1px solid #2b3a55;
+  background: #0b1220;
+  color: #eef2f7;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.lf-kind {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #93a0b5;
+}
+
+.lf-kind b {
+  color: #1d9e75;
+  font-weight: 600;
+}
+
+.lf-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.lf-btn {
+  border: 0;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.lf-btn-primary {
+  background: #1d9e75;
+  color: #06281d;
+}
+
+.lf-btn-ghost {
+  background: #1c2740;
+  color: #eef2f7;
+}
+
+.lf-toast {
+  top: 12px;
+  right: 12px;
+  left: auto;
+  width: 320px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.lf-toast.ok {
+  border-color: #1d9e75;
+}
+
+.lf-toast.warn {
+  border-color: #f5c15c;
+}
+
+.lf-toast-fail {
+  margin-top: 8px;
+  color: #f5c15c;
+  font-size: 12px;
+}
