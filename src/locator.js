@@ -19,10 +19,115 @@
     return (el && (el.innerText || el.textContent) || "").replace(/\s+/g, " ").trim();
   }
 
+  function cleanLabel(text, el) {
+    let t = String(text || "")
+      .replace(/\s+/g, " ")
+      .replace(/[*:：]+$/g, "")
+      .trim();
+    if (!t || t.length > 80) return "";
+    if (el) {
+      const val = String(el.value || "").trim();
+      if (val && t.toLowerCase() === val.toLowerCase()) return "";
+    }
+    if (/^(on|off|yes|no|true|false|select|choose)$/i.test(t)) return "";
+    return t;
+  }
+
+  function fromAttr(el, name) {
+    return cleanLabel(el.getAttribute(name), el);
+  }
+
+  function labelFromContainer(container, el) {
+    if (!container) return "";
+    const kids = [...container.children];
+    for (const kid of kids) {
+      if (kid === el || kid.contains(el)) continue;
+      if (kid.matches("input, textarea, select, button")) continue;
+      if (
+        kid.matches(
+          "label, legend, p, span, h2, h3, h4, h5, h6, [class*='MuiFormLabel'], [class*='MuiInputLabel'], [class*='label' i], [class*='Label']"
+        )
+      ) {
+        const t = cleanLabel(textOf(kid), el);
+        if (t) return t;
+      }
+      const nested = kid.querySelector(
+        ":scope > label, :scope > legend, :scope > span, :scope > p, :scope > [class*='label' i]"
+      );
+      if (nested && !nested.contains(el)) {
+        const t = cleanLabel(textOf(nested), el);
+        if (t) return t;
+      }
+    }
+    return "";
+  }
+
+  function labelWalk(el) {
+    let node = el;
+    for (let depth = 0; depth < 8 && node && node !== document.body; depth++) {
+      const parent = node.parentElement;
+      if (!parent) break;
+
+      const fromParent = labelFromContainer(parent, el);
+      if (fromParent) return fromParent;
+
+      let sib = node.previousElementSibling;
+      while (sib) {
+        if (!sib.contains(el) && !sib.matches("input, textarea, select, button")) {
+          const t = cleanLabel(textOf(sib), el);
+          if (t) return t;
+        }
+        sib = sib.previousElementSibling;
+      }
+
+      node = parent;
+    }
+    return "";
+  }
+
+  function labelAbove(el) {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return "";
+    const x = r.left + Math.min(48, Math.max(8, r.width / 3));
+    const y = r.top - 8;
+    if (y < 0) return "";
+    let stack = [];
+    try {
+      stack = document.elementsFromPoint(x, y) || [];
+    } catch {
+      return "";
+    }
+    for (const node of stack) {
+      if (!(node instanceof Element)) continue;
+      if (node === el || el.contains(node) || node.contains(el)) continue;
+      if (isOurUI(node)) continue;
+      if (node.matches("input, textarea, select, button")) continue;
+      const t = cleanLabel(textOf(node), el);
+      if (t) return t;
+    }
+    return "";
+  }
+
+  function humanizeToken(value) {
+    return cleanLabel(
+      String(value || "")
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .replace(/[-_./]+/g, " ")
+        .replace(/\d+$/g, ""),
+      null
+    );
+  }
+
   function getLabel(el) {
     if (!el) return "";
-    const aria = el.getAttribute("aria-label");
-    if (aria) return aria.trim();
+
+    if (el.labels && el.labels.length) {
+      const t = cleanLabel([...el.labels].map(textOf).filter(Boolean).join(" "), el);
+      if (t) return t;
+    }
+
+    const aria = fromAttr(el, "aria-label");
+    if (aria) return aria;
 
     const labelledBy = el.getAttribute("aria-labelledby");
     if (labelledBy) {
@@ -32,44 +137,71 @@
         .filter(Boolean)
         .map(textOf)
         .filter(Boolean);
-      if (parts.length) return parts.join(" ");
+      const t = cleanLabel(parts.join(" "), el);
+      if (t) return t;
     }
 
     if (el.id) {
-      const forLabel = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
-      if (forLabel) return textOf(forLabel);
+      try {
+        const forLabel = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+        const t = cleanLabel(textOf(forLabel), el);
+        if (t) return t;
+      } catch {
+        /* ignore */
+      }
     }
 
     const wrapLabel = el.closest("label");
     if (wrapLabel) {
       const clone = wrapLabel.cloneNode(true);
       clone.querySelectorAll("input, textarea, select, button").forEach((n) => n.remove());
-      const t = textOf(clone);
+      const t = cleanLabel(textOf(clone), el);
       if (t) return t;
     }
 
     const group = el.closest(
-      '.MuiFormControl-root, [class*="FormControl"], [class*="form-control"], .form-group, [data-testid], .field'
+      [
+        ".MuiFormControl-root",
+        "[class*='FormControl']",
+        "[class*='form-control']",
+        "[class*='FormField']",
+        "[class*='form-field']",
+        "[class*='formField']",
+        "[class*='InputWrapper']",
+        "[class*='input-wrap']",
+        ".form-group",
+        "[data-testid]",
+        ".field",
+        "fieldset"
+      ].join(",")
     );
-    if (group) {
-      const lab = group.querySelector("label, .MuiFormLabel-root, .MuiInputLabel-root, legend, [class*='Label']");
-      if (lab && lab !== el) {
-        const t = textOf(lab);
-        if (t && t.length < 80) return t;
-      }
+    const grouped = labelFromContainer(group, el);
+    if (grouped) return grouped;
+
+    const walked = labelWalk(el);
+    if (walked) return walked;
+
+    const above = labelAbove(el);
+    if (above) return above;
+
+    const groupAria = el.closest("[aria-label]");
+    if (groupAria && groupAria !== el) {
+      const t = fromAttr(groupAria, "aria-label");
+      if (t) return t;
     }
 
-    let prev = el.parentElement && el.parentElement.previousElementSibling;
-    if (prev) {
-      const t = textOf(prev);
-      if (t && t.length < 80 && /[A-Za-z]/.test(t)) return t;
-    }
+    const placeholder = fromAttr(el, "placeholder");
+    if (placeholder) return placeholder;
 
-    const placeholder = el.getAttribute("placeholder");
-    if (placeholder) return placeholder.trim();
+    const title = fromAttr(el, "title");
+    if (title) return title;
 
-    const name = el.getAttribute("name");
-    if (name) return name.replace(/[_-]+/g, " ");
+    const testid = el.getAttribute("data-testid") || el.closest("[data-testid]")?.getAttribute("data-testid");
+    const fromTest = humanizeToken(testid);
+    if (fromTest) return fromTest;
+
+    const name = humanizeToken(el.getAttribute("name") || el.getAttribute("id"));
+    if (name) return name;
 
     return "";
   }
