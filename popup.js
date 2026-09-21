@@ -557,7 +557,7 @@ async function refreshPagePill() {
     pill.textContent = "Meesho Ready";
     pill.className = "ready ok";
   } else if (/localhost|127\.0\.0\.1/.test(url)) {
-    pill.textContent = "Demo page";
+    pill.textContent = "Ready";
     pill.className = "ready ok";
   } else {
     pill.textContent = "Open listing page";
