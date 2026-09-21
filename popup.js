@@ -99,15 +99,24 @@ function status(text, bad) {
   if (!bad) setTimeout(() => el.classList.add("hidden"), 3200);
 }
 
-function payUrl() {
-  if (LF_BILLING.checkoutUrl) return LF_BILLING.checkoutUrl;
-  if (LF_BILLING.whatsapp) {
-    const msg = encodeURIComponent(
-      `Hi, I want ListFill Pro (${LF_BILLING.priceLabel}). Please send my license key.`
-    );
-    return `https://wa.me/${LF_BILLING.whatsapp.replace(/\D/g, "")}?text=${msg}`;
+function digits(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function bindContactLinks() {
+  const email = LF_BILLING.email || "prathameshbusa@gmail.com";
+  const phone = LF_BILLING.phone || "8806907616";
+  const mail = $("contact-email");
+  const tel = $("contact-phone");
+  if (mail) {
+    mail.href = `mailto:${email}?subject=${encodeURIComponent("ListFill Pro license")}`;
+    mail.textContent = email;
   }
-  return "";
+  if (tel) {
+    const num = digits(phone);
+    tel.href = `tel:+${num.length === 10 ? "91" + num : num}`;
+    tel.textContent = phone;
+  }
 }
 
 async function refreshPlanUI() {
@@ -116,23 +125,12 @@ async function refreshPlanUI() {
   const badge = $("plan-badge");
   const price = $("pay-price");
   const year = $("pay-year");
-  const pay = $("btn-pay");
   const banner = $("plan-banner");
   if (badge) badge.textContent = access.label;
   renderProfile(access);
   if (price) price.textContent = LF_BILLING.priceLabel;
   if (year) year.textContent = LF_BILLING.yearlyLabel || "";
-  const url = payUrl();
-  if (pay) {
-    if (url) {
-      pay.href = url;
-      pay.textContent = "Pay & get license";
-      pay.classList.remove("hidden");
-    } else {
-      pay.href = "#";
-      pay.textContent = "Set checkout or WhatsApp in license-config.js";
-    }
-  }
+  bindContactLinks();
   if (!banner) return;
   if (access.plan === "pro") {
     banner.classList.add("hidden");

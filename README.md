@@ -25,14 +25,9 @@ The Chrome Web Store listing is **free to install**. Autofill is free for **5 da
 
 Chrome does **not** bill subscriptions for you anymore. You take payment outside the store (Razorpay is the usual choice in India), then send the seller a license key.
 
-### 1. Set your billing details
+### 1. Billing contact
 
-Edit `license-config.js`:
-
-- `whatsapp` — digits only, e.g. `9198xxxxxxxx` (Pay button opens WhatsApp)
-- `checkoutUrl` — Razorpay / Stripe payment link (used instead of WhatsApp if set)
-- `priceLabel` / `yearlyLabel`
-- `signingSecret` — change this before you publish, and **never share it**
+Customers contact the admin for a key. Email and mobile are in `license-config.js` (`email`, `phone`) and shown on the Upgrade screen.
 
 ### 2. Issue a key (one computer only)
 

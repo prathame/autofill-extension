@@ -79,6 +79,31 @@ body {
   margin: 8px 0 4px;
 }
 
+.contact-admin {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+
+.contact-admin a {
+  display: block;
+  text-align: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--subtle);
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 650;
+  font-size: 13px;
+}
+
+.contact-admin a:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .paywall {
   position: fixed;
   inset: 0;
