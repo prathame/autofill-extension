@@ -125,7 +125,8 @@ function sendFile(res, filePath, type) {
   if (!existsSync(filePath)) return false;
   res.writeHead(200, {
     "content-type": type,
-    "cache-control": "no-store",
+    "cache-control": "no-store, no-cache, must-revalidate",
+    "pragma": "no-cache",
     "access-control-allow-origin": "*"
   });
   res.end(readFileSync(filePath));
@@ -159,7 +160,7 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   try {
     if (req.method === "GET" && url.pathname === "/health") {
-      return json(res, 200, { ok: true, maxDevices, persist: pool ? "postgres" : "file" });
+      return json(res, 200, { ok: true, maxDevices, persist: pool ? "postgres" : "file", version: "names-1" });
     }
 
     if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/admin" || url.pathname === "/admin/")) {
