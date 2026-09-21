@@ -160,7 +160,7 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   try {
     if (req.method === "GET" && url.pathname === "/health") {
-      return json(res, 200, { ok: true, maxDevices, persist: pool ? "postgres" : "file", version: "names-1" });
+      return json(res, 200, { ok: true, maxDevices, persist: pool ? "postgres" : "file", version: "names-2" });
     }
 
     if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/admin" || url.pathname === "/admin/")) {
@@ -281,6 +281,19 @@ const server = createServer(async (req, res) => {
       db.keys[matches[0]].revoked = true;
       await saveDb(db);
       return json(res, 200, { ok: true, name: db.keys[matches[0]].name || "" });
+    }
+
+    if (req.method === "POST" && url.pathname === "/v1/admin/delete") {
+      if (!isAdmin(req)) return json(res, 401, { ok: false, error: "Admin token required." });
+      const matches = matchKeys(db, body.key || body.name || body.query);
+      if (!matches.length) return json(res, 404, { ok: false, error: "No customer or key matched." });
+      if (matches.length > 1) {
+        return json(res, 400, { ok: false, error: "Several people matched that name. Paste the full key." });
+      }
+      const name = db.keys[matches[0]].name || "";
+      delete db.keys[matches[0]];
+      await saveDb(db);
+      return json(res, 200, { ok: true, name });
     }
 
     json(res, 404, { ok: false, error: "Not found" });

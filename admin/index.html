@@ -18,6 +18,7 @@
         background: var(--card); border: 1px solid var(--border); border-radius: 10px;
         padding: 10px; margin-bottom: 8px; font-size: 12px; cursor: pointer;
       }
+      .row-del { width: auto; margin-top: 8px; padding: 6px 10px; }
       .history code { display: block; word-break: break-all; margin: 4px 0; color: var(--accent); }
       .warn { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
       .ok { color: var(--ok); font-size: 12px; }
@@ -75,12 +76,13 @@
       </section>
 
       <section class="card" style="margin-top: 14px">
-        <p class="section-label">Look up / reset</p>
+        <p class="section-label">Look up / reset / delete</p>
         <input id="lookup-key" class="input" type="text" placeholder="Customer name or paste a key" />
         <div class="row-end">
           <button id="lookup" class="btn-ghost sm-btn" type="button">Look up</button>
           <button id="reset" class="btn-ghost sm-btn" type="button">Reset device</button>
-          <button id="revoke" class="btn-save sm-btn" type="button">Revoke</button>
+          <button id="revoke" class="btn-ghost sm-btn" type="button">Revoke</button>
+          <button id="delete-key" class="btn-danger sm-btn" type="button">Delete</button>
         </div>
         <p id="lookup-out" class="warn"></p>
       </section>
@@ -133,7 +135,7 @@
       function rowHtml(row) {
         const who = row.name ? esc(row.name) : "Unnamed";
         const status = row.revoked ? "REVOKED" : (row.deviceCount ? `${row.deviceCount} device` : "not activated");
-        return `<li data-key="${esc(row.key)}"><strong>${who}</strong> · ${esc(row.plan)} · expires ${esc(row.expires)} · ${status}<code>${esc(row.key)}</code></li>`;
+        return `<li data-key="${esc(row.key)}"><strong>${who}</strong> · ${esc(row.plan)} · expires ${esc(row.expires)} · ${status}<code>${esc(row.key)}</code><button type="button" class="btn-danger sm-btn row-del" data-delete="${esc(row.key)}">Delete</button></li>`;
       }
 
       function describe(row) {
@@ -156,7 +158,31 @@
         }
       }
 
-      $("history").addEventListener("click", (ev) => {
+      async function deleteKey(query) {
+        const q = String(query || "").trim();
+        if (!q) {
+          $("lookup-out").textContent = "Enter a name or key first.";
+          return;
+        }
+        if (!confirm("Delete this key permanently? The customer will need a new key.")) return;
+        const data = await admin("/v1/admin/delete", { query: q });
+        $("lookup-out").textContent = data.ok
+          ? `Deleted ${data.name || "this key"}. It is gone from the server.`
+          : data.error;
+        if (data.ok) {
+          $("lookup-key").value = "";
+          refreshList();
+        }
+      }
+
+      $("history").addEventListener("click", async (ev) => {
+        const del = ev.target.closest("[data-delete]");
+        if (del) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          await deleteKey(del.getAttribute("data-delete"));
+          return;
+        }
         const li = ev.target.closest("li[data-key]");
         if (!li) return;
         $("lookup-key").value = li.getAttribute("data-key");
@@ -211,6 +237,7 @@
           : data.error;
         if (data.ok) refreshList();
       });
+      $("delete-key").addEventListener("click", () => deleteKey($("lookup-key").value.trim()));
 
       refreshList();
       ping();
