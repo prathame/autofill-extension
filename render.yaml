@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: listfill-license
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: LICENSE_ADMIN_TOKEN
+        generateValue: true
+      - key: MAX_DEVICES
+        value: "1"

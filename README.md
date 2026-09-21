@@ -34,20 +34,48 @@ Edit `license-config.js`:
 - `priceLabel` / `yearlyLabel`
 - `signingSecret` — change this before you publish, and **never share it**
 
-### 2. Take payment
+### 2. Issue a key (one computer only)
 
-Create a Razorpay Payment Link or Subscription for ₹199 / month (and optional yearly). After a successful payment, issue a key:
+Start the license server (keeps keys from being shared):
 
 ```bash
-node tools/issue-license.mjs monthly
-node tools/issue-license.mjs yearly
+cd /Users/apple/mesho
+node server/license-server.mjs
 ```
+
+Copy the **admin token** it prints. Then open [http://127.0.0.1:8787/admin/](http://127.0.0.1:8787/admin/) (also run `python3 -m http.server 8787` if needed).
+
+1. Paste the admin token
+2. Pick Monthly / Yearly / Lifetime → **Issue key** → **Copy key**
+3. Customer pastes it in ListFill → Activate
+
+The first computer that activates **owns** that key. A second computer gets: “already active on another computer.”
+
+If the seller gets a new laptop, paste their key in the admin page and click **Reset device**. **Revoke** kills the key for everyone.
+
+Keep `licenseServerUrl` in `license-config.js` pointed at this server (local: `http://127.0.0.1:8788`, later your hosted URL).
 
 Paste that key to the customer. They open ListFill → Upgrade → **Activate**.
 
-Capture and saved variants stay free even after the trial, so a seller can still prepare listings.
+### 3. Host the license server (Render + Neon)
 
-License checks run in the extension. A determined user can bypass a client-only key. For real enforcement later, validate keys on a small server.
+Postgres is only used to remember **which keys you issued** and **which computer owns each key**. The trial works without it. Render’s free web service wipes local files when it sleeps, and Render’s free Postgres expires after 30 days — so production uses **Neon** (free Postgres that stays).
+
+1. Create a project at https://console.neon.tech (region close to you, e.g. Singapore / Mumbai)
+2. Dashboard → **Connect** → copy the **pooled** URI (host contains `-pooler`)
+3. On Render: **New → Web Service** → connect `prathame/autofill-extension`
+   - Runtime: Node
+   - Build: `npm install`
+   - Start: `npm start`
+   - Instance: **Free**
+   - Health check: `/health`
+4. Environment:
+   - `DATABASE_URL` = the Neon URI
+   - `LICENSE_ADMIN_TOKEN` = a long random string (save this; you need it to issue keys)
+   - `MAX_DEVICES` = `1`
+5. After deploy, open `https://YOUR-SERVICE.onrender.com/health` — it should show `"persist":"postgres"`
+6. Issue keys at `https://YOUR-SERVICE.onrender.com/admin/` (paste the admin token)
+7. Put that same `https://YOUR-SERVICE.onrender.com` into `license-config.js` as `licenseServerUrl`, then reload the extension
 
 ## Publish on the Chrome Web Store
 

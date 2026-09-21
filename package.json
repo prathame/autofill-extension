@@ -1,0 +1,14 @@
+{
+  "name": "listfill-license-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server/license-server.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}

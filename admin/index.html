@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ListFill · Issue license keys</title>
+    <link rel="stylesheet" href="/popup.css" />
+    <style>
+      html, body { width: 100%; min-height: 100vh; max-height: none; overflow: auto; }
+      .wrap { max-width: 560px; margin: 32px auto; padding: 0 16px 40px; }
+      .result {
+        word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px; background: var(--input); border: 1px solid var(--border);
+        border-radius: 10px; padding: 12px; margin: 8px 0 12px;
+      }
+      .history { list-style: none; padding: 0; margin: 0; }
+      .history li {
+        background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+        padding: 10px; margin-bottom: 8px; font-size: 12px;
+      }
+      .history code { display: block; word-break: break-all; margin: 4px 0; color: var(--accent); }
+      .warn { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+      .ok { color: var(--ok); font-size: 12px; }
+      .err { color: var(--danger); font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="brand" style="margin-bottom: 18px">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="m5 12 5 5L20 7"></path>
+            <path d="M12 20h8"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-name">ListFill <span class="pro">ADMIN</span></div>
+          <p class="brand-sub">Issue keys · one computer per key</p>
+        </div>
+      </header>
+
+      <section class="card">
+        <p class="warn">Each key works on <strong>one computer</strong>. If a customer shares it, the second PC is blocked. Start the license server first.</p>
+        <label class="tiny" for="server">License server</label>
+        <input id="server" class="input" type="text" value="http://127.0.0.1:8788" />
+        <label class="tiny" for="token">Admin token</label>
+        <input id="token" class="input" type="password" placeholder="Printed when the server starts" />
+        <p id="health" class="warn"></p>
+
+        <label class="tiny" for="plan">Plan</label>
+        <select id="plan" class="input">
+          <option value="monthly">Monthly · 31 days</option>
+          <option value="yearly">Yearly · 366 days</option>
+          <option value="lifetime">Lifetime · 10 years</option>
+        </select>
+        <button id="issue" class="btn-glow" type="button">Issue key</button>
+        <p id="issue-msg"></p>
+        <div id="out" class="hidden">
+          <p class="tiny" id="expires"></p>
+          <div id="key" class="result"></div>
+          <button id="copy" class="btn-ghost" type="button">Copy key</button>
+        </div>
+      </section>
+
+      <section class="card" style="margin-top: 14px">
+        <p class="section-label">Look up / reset a key</p>
+        <input id="lookup-key" class="input" type="text" placeholder="Paste a customer key" />
+        <div class="row-end">
+          <button id="lookup" class="btn-ghost sm-btn" type="button">Look up</button>
+          <button id="reset" class="btn-ghost sm-btn" type="button">Reset device</button>
+          <button id="revoke" class="btn-save sm-btn" type="button">Revoke</button>
+        </div>
+        <p id="lookup-out" class="warn"></p>
+      </section>
+
+      <p class="section-label" style="margin: 18px 0 8px">Issued on this computer</p>
+      <ul id="history" class="history"></ul>
+    </div>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const defaultServer = location.protocol.startsWith("http") ? location.origin : "http://127.0.0.1:8788";
+      $("token").value = localStorage.getItem("lf_admin_token") || "";
+      $("server").value = localStorage.getItem("lf_admin_server") || defaultServer;
+
+      function saveSettings() {
+        localStorage.setItem("lf_admin_token", $("token").value.trim());
+        localStorage.setItem("lf_admin_server", $("server").value.replace(/\/$/, ""));
+      }
+
+      async function admin(path, body) {
+        saveSettings();
+        const res = await fetch($("server").value.replace(/\/$/, "") + path, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-admin-token": $("token").value.trim()
+          },
+          body: JSON.stringify(body || {})
+        });
+        return res.json();
+      }
+
+      async function ping() {
+        try {
+          const res = await fetch($("server").value.replace(/\/$/, "") + "/health");
+          const data = await res.json();
+          $("health").innerHTML = data.ok
+            ? `<span class="ok">Server online · max ${data.maxDevices} device per key</span>`
+            : `<span class="err">Server not ready</span>`;
+        } catch {
+          $("health").innerHTML = `<span class="err">Server offline. Run: node server/license-server.mjs</span>`;
+        }
+      }
+
+      function loadHistory() {
+        try { return JSON.parse(localStorage.getItem("lf_issued_keys") || "[]"); } catch { return []; }
+      }
+      function saveHistory(list) {
+        localStorage.setItem("lf_issued_keys", JSON.stringify(list.slice(0, 50)));
+      }
+      function renderHistory() {
+        const list = loadHistory();
+        $("history").innerHTML = list.length
+          ? list.map((row) => `<li><strong>${row.plan}</strong> · expires ${row.expires}<code>${row.key}</code></li>`).join("")
+          : `<li class="muted">No keys issued yet.</li>`;
+      }
+
+      $("issue").addEventListener("click", async () => {
+        $("issue-msg").textContent = "";
+        try {
+          const data = await admin("/v1/issue", { plan: $("plan").value });
+          if (!data.ok) {
+            $("issue-msg").innerHTML = `<span class="err">${data.error || "Issue failed"}</span>`;
+            return;
+          }
+          $("out").classList.remove("hidden");
+          $("key").textContent = data.key;
+          $("expires").textContent = "Expires " + data.expires + " · bound to first computer that activates";
+          const hist = loadHistory();
+          hist.unshift({ plan: data.plan, key: data.key, expires: data.expires, at: Date.now() });
+          saveHistory(hist);
+          renderHistory();
+        } catch {
+          $("issue-msg").innerHTML = `<span class="err">Cannot reach server. Start it with node server/license-server.mjs</span>`;
+        }
+      });
+
+      $("copy").addEventListener("click", async () => {
+        const key = $("key").textContent.trim();
+        if (!key) return;
+        await navigator.clipboard.writeText(key);
+        $("copy").textContent = "Copied";
+        setTimeout(() => ($("copy").textContent = "Copy key"), 1400);
+      });
+
+      $("lookup").addEventListener("click", async () => {
+        const data = await admin("/v1/admin/lookup", { key: $("lookup-key").value.trim() });
+        $("lookup-out").textContent = data.ok
+          ? `${data.plan} · ${data.deviceCount} device · ${data.revoked ? "REVOKED" : "active"}`
+          : data.error || "Not found";
+      });
+      $("reset").addEventListener("click", async () => {
+        const data = await admin("/v1/admin/reset", { key: $("lookup-key").value.trim() });
+        $("lookup-out").textContent = data.ok ? "Device reset. Customer can activate on a new computer." : data.error;
+      });
+      $("revoke").addEventListener("click", async () => {
+        const data = await admin("/v1/admin/revoke", { key: $("lookup-key").value.trim() });
+        $("lookup-out").textContent = data.ok ? "Key revoked. It will not work on any computer." : data.error;
+      });
+
+      renderHistory();
+      ping();
+    </script>
+  </body>
+</html>
