@@ -1,15 +1,17 @@
-# ListFill for Meesho
+# ListFill for Meesho & Flipkart
 
-Independent Chrome extension that saves reusable product variants and autofills the Meesho supplier **Add Product** form. You still review and submit the catalog yourself.
+Independent Chrome extension that saves reusable product variants and autofills **Meesho** and **Flipkart Seller Hub** listing forms. You still review and submit the catalog yourself.
 
-This is not affiliated with Meesho.
+This is not affiliated with Meesho or Flipkart.
 
 ## Install (unpacked, for testing)
 
 1. Open `chrome://extensions`
 2. Enable **Developer mode**
 3. Click **Load unpacked** and select this folder (the one with `manifest.json`, not `node_modules`)
-4. Pin **ListFill for Meesho**
+4. Pin **ListFill**
+
+On **Meesho**, open the supplier Add Product page. On **Flipkart**, open Seller Hub (`seller.flipkart.com`) → Listings → Add a Single Listing. The pill should say Meesho Ready or Flipkart Ready.
 
 Practice page: `python3 -m http.server 8787` then open http://127.0.0.1:8787/demo/
 

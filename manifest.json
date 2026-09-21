@@ -1,15 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "ListFill for Meesho",
-  "version": "1.2.0",
-  "description": "Save reusable product variants and autofill the Meesho supplier Add Product form in one click. Independent unofficial tool.",
+  "name": "ListFill for Meesho & Flipkart",
+  "version": "1.3.0",
+  "description": "Save reusable product variants and autofill Meesho and Flipkart seller listing forms in one click. Independent unofficial tool.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "ListFill for Meesho",
+    "default_title": "ListFill",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
@@ -24,6 +24,8 @@
   "host_permissions": [
     "https://supplier.meesho.com/*",
     "https://*.meesho.com/*",
+    "https://seller.flipkart.com/*",
+    "https://*.seller.flipkart.com/*",
     "http://127.0.0.1/*",
     "http://localhost/*"
   ],
@@ -32,6 +34,8 @@
       "matches": [
         "https://supplier.meesho.com/*",
         "https://*.meesho.com/*",
+        "https://seller.flipkart.com/*",
+        "https://*.seller.flipkart.com/*",
         "http://127.0.0.1/*",
         "http://localhost/*"
       ],

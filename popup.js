@@ -1,7 +1,7 @@
 const $ = (id) => document.getElementById(id);
 
 let draft = null;
-let meeshoTab = null;
+let listingTab = null;
 let capturing = false;
 const KIND_LABEL = {
   text: "Text",
@@ -171,30 +171,41 @@ async function loadTheme() {
   await applyTheme(data.lf_theme || "dark");
 }
 
+const LISTING_OK = /meesho\.com|seller\.flipkart\.com|localhost|127\.0\.0\.1/;
+const LISTING_URLS = [
+  "https://supplier.meesho.com/*",
+  "https://*.meesho.com/*",
+  "https://seller.flipkart.com/*",
+  "https://*.seller.flipkart.com/*",
+  "http://127.0.0.1/*",
+  "http://localhost/*"
+];
+
 async function findTargetTab() {
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const ok = (url = "") => /meesho\.com|localhost|127\.0\.0\.1/.test(url);
+  const ok = (url = "") => LISTING_OK.test(url);
   if (active && ok(active.url)) return active;
-  const tabs = await chrome.tabs.query({
-    url: ["https://supplier.meesho.com/*", "https://*.meesho.com/*", "http://127.0.0.1/*", "http://localhost/*"]
-  });
+  const tabs = await chrome.tabs.query({ url: LISTING_URLS });
   return tabs[0] || active || null;
 }
 
 async function sendToTab(message) {
-  if (!meeshoTab?.id) throw new Error("Open a Meesho Add Product page first");
+  listingTab = await findTargetTab();
+  if (!listingTab?.id || !LISTING_OK.test(listingTab.url || "")) {
+    throw new Error("Open a Meesho or Flipkart listing page first");
+  }
   try {
-    return await chrome.tabs.sendMessage(meeshoTab.id, message);
+    return await chrome.tabs.sendMessage(listingTab.id, message);
   } catch {
     await chrome.scripting.executeScript({
-      target: { tabId: meeshoTab.id },
+      target: { tabId: listingTab.id },
       files: ["shared.js", "src/locator.js", "src/fill.js", "src/capture.js", "src/content.js"]
     });
     await chrome.scripting.insertCSS({
-      target: { tabId: meeshoTab.id },
+      target: { tabId: listingTab.id },
       files: ["src/content.css"]
     });
-    return await chrome.tabs.sendMessage(meeshoTab.id, message);
+    return await chrome.tabs.sendMessage(listingTab.id, message);
   }
 }
 
@@ -548,11 +559,14 @@ async function stopCapture() {
 }
 
 async function refreshPagePill() {
-  meeshoTab = await findTargetTab();
+  listingTab = await findTargetTab();
   const pill = $("page-pill");
-  const url = meeshoTab?.url || "";
+  const url = listingTab?.url || "";
   if (/supplier\.meesho\.com/.test(url)) {
     pill.textContent = "Meesho Ready";
+    pill.className = "ready ok";
+  } else if (/seller\.flipkart\.com/.test(url)) {
+    pill.textContent = "Flipkart Ready";
     pill.className = "ready ok";
   } else if (/localhost|127\.0\.0\.1/.test(url)) {
     pill.textContent = "Ready";
