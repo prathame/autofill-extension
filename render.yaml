@@ -3,7 +3,7 @@ services:
     name: listfill-license
     runtime: node
     plan: free
-    buildCommand: npm install --prefix server
+    buildCommand: npm install --prefix server --omit=dev
     startCommand: node server/license-server.mjs
     healthCheckPath: /health
     envVars:
