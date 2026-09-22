@@ -195,6 +195,14 @@ async function sendToTab(message) {
     throw new Error("Open a Meesho or Flipkart listing page first");
   }
   try {
+    await chrome.scripting.executeScript({
+      target: { tabId: listingTab.id },
+      files: ["src/locator.js"]
+    });
+  } catch {
+    /* page may not allow scripting until granted */
+  }
+  try {
     return await chrome.tabs.sendMessage(listingTab.id, message);
   } catch {
     await chrome.scripting.executeScript({

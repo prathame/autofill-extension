@@ -22,14 +22,18 @@
   function cleanLabel(text, el) {
     let t = String(text || "")
       .replace(/\s+/g, " ")
-      .replace(/[*:：]+$/g, "")
+      .replace(/[ⓘℹ️?]+/g, " ")
+      .replace(/\s*[*:：]+\s*$/g, "")
+      .replace(/^\s*[*:：]+\s*/g, "")
       .trim();
+    t = t.replace(/^(enter|select|choose|pick|add)\s+/i, "").trim();
     if (!t || t.length > 80) return "";
+    if (!/\p{L}{2,}/u.test(t)) return "";
     if (el) {
       const val = String(el.value || "").trim();
       if (val && t.toLowerCase() === val.toLowerCase()) return "";
     }
-    if (/^(on|off|yes|no|true|false|select|choose)$/i.test(t)) return "";
+    if (/^(on|off|yes|no|true|false|select|choose|search|filter)$/i.test(t)) return "";
     return t;
   }
 
@@ -42,14 +46,15 @@
     const kids = [...container.children];
     for (const kid of kids) {
       if (kid === el || kid.contains(el)) continue;
-      if (kid.matches("input, textarea, select, button")) continue;
+      if (kid.matches("input, textarea, select, button, svg, img")) continue;
+      const direct = cleanLabel(textOf(kid), el);
+      if (direct && kid.children.length <= 6 && kid.getBoundingClientRect().height < 80) return direct;
       if (
         kid.matches(
           "label, legend, p, span, h2, h3, h4, h5, h6, [class*='MuiFormLabel'], [class*='MuiInputLabel'], [class*='label' i], [class*='Label']"
         )
       ) {
-        const t = cleanLabel(textOf(kid), el);
-        if (t) return t;
+        if (direct) return direct;
       }
       const nested = kid.querySelector(
         ":scope > label, :scope > legend, :scope > span, :scope > p, :scope > [class*='label' i]"
@@ -64,7 +69,7 @@
 
   function labelWalk(el) {
     let node = el;
-    for (let depth = 0; depth < 8 && node && node !== document.body; depth++) {
+    for (let depth = 0; depth < 16 && node && node !== document.body; depth++) {
       const parent = node.parentElement;
       if (!parent) break;
 
@@ -73,7 +78,7 @@
 
       let sib = node.previousElementSibling;
       while (sib) {
-        if (!sib.contains(el) && !sib.matches("input, textarea, select, button")) {
+        if (!sib.contains(el) && !sib.matches("input, textarea, select, button, svg, img")) {
           const t = cleanLabel(textOf(sib), el);
           if (t) return t;
         }
@@ -83,6 +88,82 @@
       node = parent;
     }
     return "";
+  }
+
+  function labelFromRow(el) {
+    let node = el;
+    for (let i = 0; i < 16 && node && node.parentElement; i++) {
+      const parent = node.parentElement;
+      let isRow = parent.matches("tr, [class*='Grid-container'], [class*='grid' i]");
+      try {
+        const d = window.getComputedStyle(parent).display || "";
+        const dir = window.getComputedStyle(parent).flexDirection || "";
+        if (d.includes("grid")) isRow = true;
+        if (d.includes("flex") && (!dir || dir.startsWith("row"))) isRow = true;
+      } catch {
+        /* ignore */
+      }
+      if (isRow) {
+        let child = el;
+        while (child.parentElement && child.parentElement !== parent) child = child.parentElement;
+        const prev = child.previousElementSibling;
+        const t = cleanLabel(textOf(prev), el);
+        if (t) return t;
+      }
+      node = parent;
+    }
+    return "";
+  }
+
+  function labelBeside(el) {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return "";
+    const y = r.top + r.height / 2;
+    const xs = [r.left - 16, r.left - 48, r.left - 96, r.left - 140];
+    for (const x of xs) {
+      if (x < 0) continue;
+      let stack = [];
+      try {
+        stack = document.elementsFromPoint(x, y) || [];
+      } catch {
+        continue;
+      }
+      for (const node of stack) {
+        if (!(node instanceof Element)) continue;
+        if (node === el || el.contains(node) || node.contains(el)) continue;
+        if (isOurUI(node)) continue;
+        if (node.matches("input, textarea, select, button, svg, img")) continue;
+        const t = cleanLabel(textOf(node), el);
+        if (t) return t;
+      }
+    }
+    return "";
+  }
+
+  function labelByGeometry(el) {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return "";
+    const nodes = document.querySelectorAll("label, span, p, div, td, th, dt, h6, h5, h4, legend");
+    let best = "";
+    let bestGap = 160;
+    for (const node of nodes) {
+      if (node === el || node.contains(el) || el.contains(node)) continue;
+      if (isOurUI(node)) continue;
+      const kids = node.children.length;
+      if (kids > 6) continue;
+      const b = node.getBoundingClientRect();
+      if (b.width < 8 || b.height < 10 || b.height > 72 || b.width > 360) continue;
+      if (b.bottom < r.top + 4 || b.top > r.bottom - 4) continue;
+      const gap = r.left - b.right;
+      if (gap < -8 || gap > 150) continue;
+      const t = cleanLabel(textOf(node), el);
+      if (!t) continue;
+      if (gap < bestGap) {
+        bestGap = gap;
+        best = t;
+      }
+    }
+    return best;
   }
 
   function labelAbove(el) {
@@ -116,6 +197,12 @@
         .replace(/\d+$/g, ""),
       null
     );
+  }
+
+  function isSmallBox(node) {
+    if (!node || node === document.body) return false;
+    const r = node.getBoundingClientRect();
+    return r.height > 0 && r.height < 160 && r.width < Math.min(window.innerWidth * 0.95, 900);
   }
 
   function getLabel(el) {
@@ -175,8 +262,17 @@
         "fieldset"
       ].join(",")
     );
-    const grouped = labelFromContainer(group, el);
+    const grouped = isSmallBox(group) ? labelFromContainer(group, el) : "";
     if (grouped) return grouped;
+
+    const row = labelFromRow(el);
+    if (row) return row;
+
+    const beside = labelBeside(el);
+    if (beside) return beside;
+
+    const geo = labelByGeometry(el);
+    if (geo) return geo;
 
     const walked = labelWalk(el);
     if (walked) return walked;
@@ -265,7 +361,7 @@
     if (el.tagName === "TEXTAREA" || el.getAttribute("role") === "textbox" && el.tagName !== "INPUT") {
       if (el.tagName === "TEXTAREA") return "textarea";
     }
-    if (el.tagName === "SELECT" || el.getAttribute("role") === "combobox" || el.getAttribute("aria-haspopup") === "listbox") {
+    if (el.closest('[role="combobox"], [aria-haspopup="listbox"], [class*="MuiSelect"], [class*="autocomplete" i]')) {
       return "select";
     }
     if (el.tagName === "TEXTAREA") return "textarea";
