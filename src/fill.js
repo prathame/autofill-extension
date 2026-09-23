@@ -118,7 +118,7 @@
 
     if (kind === "file" || (el.getAttribute("type") || "").toLowerCase() === "file") return false;
     if (kind === "checkbox" || kind === "radio") return fillCheckbox(el, value);
-    if (kind === "select" || el.tagName === "SELECT" || el.getAttribute("role") === "combobox") {
+    if (kind === "select" || el.tagName === "SELECT" || el.getAttribute("role") === "combobox" || LFLocator.looksLikeDropdown?.(el)) {
       return fillSelect(el, value);
     }
     if (kind === "size" && (el.tagName === "BUTTON" || el.getAttribute("role") === "button" || LFLocator.looksLikeSizeChip(el))) {

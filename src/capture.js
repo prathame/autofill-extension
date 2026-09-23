@@ -209,7 +209,8 @@
     `;
     dialog.querySelector('[data-lf="label"]').value = label;
     dialog.querySelector('[data-lf="value"]').value = current || "";
-    dialog.querySelector(".lf-kind b").textContent = kind;
+    dialog.querySelector(".lf-kind b").textContent =
+      kind === "select" ? "dropdown" : kind === "textarea" ? "long text" : kind;
 
     root().appendChild(dialog);
     const valueEl = dialog.querySelector('[data-lf="value"]');

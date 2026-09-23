@@ -349,25 +349,78 @@
     return "/" + parts.join("/");
   }
 
+  function looksLikeDropdown(el) {
+    if (!el) return false;
+    if (el.tagName === "SELECT") return true;
+    const role = (el.getAttribute("role") || "").toLowerCase();
+    if (role === "combobox" || role === "listbox") return true;
+    const popup = (el.getAttribute("aria-haspopup") || "").toLowerCase();
+    if (popup === "listbox" || popup === "menu" || popup === "true") return true;
+    if ((el.getAttribute("aria-autocomplete") || "").toLowerCase() === "list") return true;
+    if (el.getAttribute("aria-expanded") === "true" || el.getAttribute("aria-expanded") === "false") return true;
+
+    const host = el.closest(
+      [
+        '[role="combobox"]',
+        '[aria-haspopup="listbox"]',
+        '[class*="MuiSelect"]',
+        '[class*="MuiAutocomplete"]',
+        '[class*="ant-select"]',
+        '[class*="Select"]',
+        '[class*="select__"]',
+        '[class*="dropdown" i]',
+        '[class*="Dropdown"]',
+        '[class*="combobox" i]',
+        '[class*="AutoComplete"]',
+        '[class*="autocomplete" i]'
+      ].join(",")
+    );
+    if (host && isSmallBox(host)) return true;
+
+    const ph = (el.getAttribute("placeholder") || el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+    if (/^(select|choose|pick)\b/.test(ph)) return true;
+
+    const type = (el.getAttribute("type") || "text").toLowerCase();
+    if (el.tagName === "INPUT" && (type === "text" || type === "search" || !type) && el.readOnly) return true;
+
+    let node = el;
+    const fieldBox = el.getBoundingClientRect();
+    for (let i = 0; i < 5 && node && node !== document.body; i++) {
+      const box = node.getBoundingClientRect();
+      if (box.height > 90) break;
+      const icon = node.querySelector(
+        "svg, [class*='ArrowDropDown'], [class*='ExpandMore'], [class*='chevron' i], [class*='caret' i], [class*='arrow' i]"
+      );
+      if (icon && isVisible(icon)) {
+        const ir = icon.getBoundingClientRect();
+        if (ir.left > fieldBox.left + fieldBox.width * 0.45 && ir.width < 40 && ir.height < 40) {
+          if (/^(select|choose|pick)\b/.test(ph) || el.readOnly || popup) return true;
+          if (el.tagName !== "TEXTAREA" && type !== "number" && type !== "email") {
+            const label = (getLabel(el) || "").toLowerCase();
+            if (!/weight|price|mrp|qty|quantity|sku|name|title|description|search/.test(label)) return true;
+          }
+        }
+      }
+      node = node.parentElement;
+    }
+    return false;
+  }
+
   function fieldKind(el, label) {
     const l = (label || "").toLowerCase();
     if (/\bsku\b/.test(l)) return "sku";
     if (/style\s*code|product\s*id|style\s*id/.test(l)) return "styleCode";
-    if (/\bsize\b/.test(l) && !/size\s*chart/.test(l)) return "size";
+    if (/\bsize\b/.test(l) && !/size\s*chart/.test(l) && !looksLikeDropdown(el)) return "size";
 
     const type = (el.getAttribute("type") || "").toLowerCase();
     if (type === "checkbox" || el.getAttribute("role") === "checkbox") return "checkbox";
     if (type === "radio" || el.getAttribute("role") === "radio") return "radio";
-    if (el.tagName === "TEXTAREA" || el.getAttribute("role") === "textbox" && el.tagName !== "INPUT") {
-      if (el.tagName === "TEXTAREA") return "textarea";
-    }
-    if (el.closest('[role="combobox"], [aria-haspopup="listbox"], [class*="MuiSelect"], [class*="autocomplete" i]')) {
-      return "select";
-    }
-    if (el.tagName === "TEXTAREA") return "textarea";
-    if (el.isContentEditable) return "textarea";
     if (type === "file") return "file";
-    if (el.tagName === "BUTTON" || el.getAttribute("role") === "button") return "size";
+    if (el.tagName === "TEXTAREA" || el.isContentEditable) return "textarea";
+    if (looksLikeDropdown(el)) return "select";
+    if (el.tagName === "BUTTON" || el.getAttribute("role") === "button") {
+      return looksLikeSizeChip(el) ? "size" : "select";
+    }
     return "text";
   }
 
@@ -547,6 +600,7 @@
     buildLocator,
     resolveLocator,
     resolveField,
+    looksLikeDropdown,
     looksLikeSizeChip,
     looksLikeUpload,
     isCaptureTarget,
