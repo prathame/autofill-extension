@@ -7,28 +7,13 @@
     return String(u || "").replace(/\/$/, "");
   }
 
-  async function sign(text) {
-    const secret = (typeof LF_BILLING !== "undefined" && LF_BILLING.signingSecret) || "";
-    const key = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(secret),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"]
-    );
-    const buf = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(text));
-    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 20);
-  }
-
   async function parseKey(raw) {
     const key = String(raw || "").trim();
     const parts = key.split(".");
     if (parts.length !== 4 || parts[0] !== "LF1") return null;
     const [, plan, expRaw, sig] = parts;
     const expiresAt = Number(expRaw);
-    if (!plan || !expiresAt) return null;
-    const expect = await sign(`${plan}|${expiresAt}`);
-    if (expect !== sig) return null;
+    if (!plan || !expiresAt || !sig) return null;
     return { plan, expiresAt, key };
   }
 
@@ -92,7 +77,7 @@
     } catch {
       const grace = ((typeof LF_BILLING !== "undefined" && LF_BILLING.offlineGraceHours) || 48) * 3600 * 1000;
       if (state.lastServerOk && Date.now() - state.lastServerOk < grace) return { ok: true };
-      return { ok: false, error: "Could not verify this license. Check the license server." };
+        return { ok: false, error: "Could not reach the license server. If it was asleep, wait 30 seconds and try again." };
     }
   }
 
@@ -166,7 +151,7 @@
         if (!data.ok) return { ok: false, error: data.error || "Could not activate this key." };
         issuedName = data.name || "";
       } catch {
-        return { ok: false, error: "License server is not running. Start it before activating." };
+        return { ok: false, error: "License server is waking up or offline. Wait 30 seconds, then activate again. Trial still works without it." };
       }
     }
     const state = await getState();

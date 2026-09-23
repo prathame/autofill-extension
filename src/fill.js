@@ -3,6 +3,16 @@
     return new Promise((r) => setTimeout(r, ms));
   }
 
+  function isListingSubmit(el) {
+    if (!el || el.nodeType !== 1) return false;
+    const type = (el.getAttribute("type") || "").toLowerCase();
+    if (type === "submit") return true;
+    const blob = `${el.getAttribute("aria-label") || ""} ${el.getAttribute("title") || ""} ${el.innerText || ""}`
+      .toLowerCase()
+      .replace(/\s+/g, " ");
+    return /send to qc|submit listing|submit product|publish listing|save and submit/.test(blob);
+  }
+
   function nativeSetter(el) {
     if (el.tagName === "TEXTAREA") return Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
     return Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
@@ -19,7 +29,7 @@
   }
 
   async function click(el, at) {
-    if (!el) return;
+    if (!el || isListingSubmit(el)) return;
     el.scrollIntoView({ block: "center", inline: "nearest" });
     await sleep(50);
     const r = el.getBoundingClientRect();
@@ -41,28 +51,39 @@
 
   function optionMatch(el, value) {
     const want = String(value).trim().toLowerCase();
+    const data = (el.getAttribute("data-label") || "").replace(/\s+/g, " ").trim().toLowerCase();
     const t = (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-    return t === want || t.includes(want);
+    return data === want || t === want || (data && data.includes(want)) || t.includes(want);
   }
 
-  async function pickFromOpenList(value) {
+  async function pickFromOpenList(value, root) {
     await sleep(220);
+    const scope = root || document;
     const options = [
-      ...document.querySelectorAll(
-        '[role="option"], [role="menuitem"], li[data-value], .MuiMenuItem-root, [class*="MenuItem"], [class*="menu-item" i], [class*="dropdown-item" i], [class*="option"], [class*="Menu"] li, [class*="menu"] li, [class*="listbox"] li, ul[role="listbox"] li'
+      ...scope.querySelectorAll(
+        '[role="option"], [role="menuitem"], [class*="CheckMarkOptionWrapper"], input[type="radio"][data-label], li[data-value], .MuiMenuItem-root, [class*="MenuItem"], [class*="menu-item" i], [class*="dropdown-item" i], [class*="option"], [class*="Menu"] li, [class*="menu"] li, [class*="listbox"] li, ul[role="listbox"] li, [popover] label'
       )
     ].filter((n) => {
       if (!LFLocator.isVisible(n) || LFLocator.isOurUI(n)) return false;
       if (n.closest("nav, header, aside, [class*='sidebar' i]")) return false;
+      const t = (n.getAttribute("data-label") || n.innerText || "").replace(/\s+/g, " ").trim();
+      if (/^select one$/i.test(t) && !/^select one$/i.test(String(value).trim())) return false;
       return true;
     });
-    const exact = options.find(
-      (o) => optionMatch(o, value) && (o.innerText || "").trim().toLowerCase() === String(value).trim().toLowerCase()
-    );
+    const want = String(value).trim().toLowerCase();
+    const exact = options.find((o) => {
+      const data = (o.getAttribute("data-label") || "").trim().toLowerCase();
+      const t = (o.innerText || "").trim().toLowerCase();
+      return data === want || t === want;
+    });
     const fuzzy = options.find((o) => optionMatch(o, value));
     const hit = exact || fuzzy;
     if (hit) {
-      await click(hit);
+      const clickable =
+        hit.closest('[class*="CheckMarkOptionWrapper"]') ||
+        hit.closest("label") ||
+        hit;
+      await click(clickable);
       return true;
     }
     return false;
@@ -74,6 +95,23 @@
         '[role="combobox"], [aria-haspopup="listbox"], [class*="MuiSelect"], [class*="Select"], [class*="select"], [class*="dropdown" i]'
       ) || el
     );
+  }
+
+  function flipkartSelectBox(el) {
+    return el.closest('[class*="SingleSelectContainer"]') || null;
+  }
+
+  function openPopoverIn(box) {
+    if (!box) return null;
+    const pop = box.querySelector("[popover], [data-testid='content-single-select']");
+    if (pop && typeof pop.showPopover === "function") {
+      try {
+        pop.showPopover();
+      } catch {
+        /* already open */
+      }
+    }
+    return pop;
   }
 
   async function fillSelect(el, value) {
@@ -90,24 +128,34 @@
       return true;
     }
 
-    const host = dropdownHost(el);
-    const box = host.getBoundingClientRect();
-    await click(host, { x: box.right - 14, y: box.top + box.height / 2 });
+    const box = flipkartSelectBox(el);
+    const host = (box && box.querySelector('[role="combobox"]')) || dropdownHost(el);
+    const rect = host.getBoundingClientRect();
+    await click(host, { x: rect.right - 14, y: rect.top + rect.height / 2 });
+    const pop = openPopoverIn(box);
     const arrow = [...(host.parentElement || host).querySelectorAll("svg, [class*='arrow' i], [class*='caret' i], [class*='chevron' i]")].find(
       (n) => LFLocator.isVisible(n) && n.getBoundingClientRect().width < 48
     );
     if (arrow && arrow !== host) await click(arrow);
-    if (await pickFromOpenList(value)) return true;
 
-    const input = host.tagName === "INPUT" ? host : host.querySelector("input") || el;
-    if (input && (input.tagName === "INPUT" || input.getAttribute("role") === "combobox")) {
-      setReactValue(input, value);
+    const search = (box || host).querySelector('input[aria-label="Search"], input[placeholder="Select"]');
+    if (search && search.closest("[popover], [data-testid='content-single-select']")) {
+      setReactValue(search, String(value));
+      await sleep(160);
+    }
+
+    const pickRoot = pop || box || document;
+    if (await pickFromOpenList(value, pickRoot)) return true;
+    if (pickRoot !== document && (await pickFromOpenList(value))) return true;
+
+    if (host.tagName === "INPUT") {
+      setReactValue(host, value);
       await sleep(200);
-      if (await pickFromOpenList(value)) return true;
-      input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+      if (await pickFromOpenList(value, pickRoot)) return true;
+      host.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
       await sleep(120);
-      if (await pickFromOpenList(value)) return true;
-      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+      if (await pickFromOpenList(value, pickRoot)) return true;
+      host.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
       return true;
     }
     return false;
@@ -151,6 +199,7 @@
     const kind = field.kind || LFLocator.fieldKind(el, field.label);
 
     if (kind === "file" || (el.getAttribute("type") || "").toLowerCase() === "file") return false;
+    if (isListingSubmit(el)) return false;
     if (kind === "checkbox" || kind === "radio") return fillCheckbox(el, value);
     if (kind === "select" || el.tagName === "SELECT" || el.getAttribute("role") === "combobox" || LFLocator.looksLikeDropdown?.(el)) {
       return fillSelect(el, value);

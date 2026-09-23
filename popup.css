@@ -164,15 +164,17 @@ body {
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  background: var(--accent);
-  color: var(--accent-ink);
+  overflow: hidden;
+  background: #0b3db7;
   display: grid;
   place-items: center;
 }
 
-.brand-mark svg {
-  width: 16px;
-  height: 16px;
+.brand-mark img {
+  width: 28px;
+  height: 28px;
+  display: block;
+  object-fit: cover;
 }
 
 .brand-name {
@@ -356,7 +358,15 @@ label,
   color: var(--muted);
 }
 
-.tiny {
+.sku-hint,
+.account-note {
+  margin: 6px 0 10px;
+  line-height: 1.4;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: none;
+  font-weight: 400;
+}
   display: block;
   font-size: 10px;
   font-weight: 700;

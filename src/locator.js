@@ -205,8 +205,55 @@
     return r.height > 0 && r.height < 160 && r.width < Math.min(window.innerWidth * 0.95, 900);
   }
 
+  function uniqueId(el) {
+    const id = el && el.id;
+    if (!id) return "";
+    try {
+      if (document.querySelectorAll(`[id="${CSS.escape(id)}"]`).length === 1) return id;
+    } catch {
+      /* ignore */
+    }
+    return "";
+  }
+
+  function flipkartNameText(name) {
+    if (!name) return "";
+    const clone = name.cloneNode(true);
+    clone.querySelectorAll("svg, [class*='Tooltip'], [class*='star' i], sup").forEach((n) => n.remove());
+    let t = cleanLabel(textOf(clone), null);
+    t = t.replace(/\s*\*?info\b[\s\S]*$/i, "").trim();
+    return t;
+  }
+
+  function flipkartAttributeLabel(el) {
+    const wrap = el.closest('[class*="AttributeWrapper"]');
+    if (wrap) {
+      const names = [...wrap.querySelectorAll('[class*="AttributeItemLabelName"]')];
+      if (names.length === 1 && !names[0].contains(el)) {
+        const t = flipkartNameText(names[0]);
+        if (t) return t;
+      }
+    }
+    const item = el.closest('[class*="EditAttributeItemWrapper"]');
+    if (!item) return "";
+    const names = [...item.querySelectorAll('[class*="AttributeItemLabelName"]')].filter((n) => !n.contains(el));
+    if (names.length !== 1) return "";
+    return flipkartNameText(names[0]);
+  }
+
+  function insideDropdownMenu(el) {
+    return !!(
+      el &&
+      el.closest &&
+      el.closest('[popover], [data-testid="content-single-select"], [class*="DropdownContent"], [class*="CheckMarkGroup"]')
+    );
+  }
+
   function getLabel(el) {
     if (!el) return "";
+
+    const fk = flipkartAttributeLabel(el);
+    if (fk) return fk;
 
     if (el.labels && el.labels.length) {
       const t = cleanLabel([...el.labels].map(textOf).filter(Boolean).join(" "), el);
@@ -310,13 +357,15 @@
   }
 
   function cssPath(el) {
-    if (el.id) return `#${CSS.escape(el.id)}`;
+    const id = uniqueId(el);
+    if (id) return `#${CSS.escape(id)}`;
     const parts = [];
     let node = el;
-    while (node && node.nodeType === 1 && parts.length < 8) {
+    while (node && node.nodeType === 1 && parts.length < 16) {
       let sel = node.tagName.toLowerCase();
-      if (node.id) {
-        parts.unshift(`#${CSS.escape(node.id)}`);
+      const nodeId = uniqueId(node);
+      if (nodeId) {
+        parts.unshift(`#${CSS.escape(nodeId)}`);
         break;
       }
       const cls = [...node.classList].filter((c) => c && !c.startsWith("listfill")).slice(0, 2);
@@ -333,7 +382,8 @@
   }
 
   function xpathOf(el) {
-    if (el.id) return `//*[@id="${el.id}"]`;
+    const id = uniqueId(el);
+    if (id) return `//*[@id="${id}"]`;
     const parts = [];
     let node = el;
     while (node && node.nodeType === 1) {
@@ -439,7 +489,11 @@
     }
     if (el.isContentEditable) return textOf(el);
     if (el.getAttribute("role") === "combobox") {
-      return (el.value || textOf(el) || el.getAttribute("value") || "").trim();
+      const shown = (el.value || textOf(el.querySelector('[class*="ButtonText"]') || el) || el.getAttribute("value") || "")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (/^(select|choose|pick)$/i.test(shown)) return "";
+      return shown;
     }
     return (el.value || "").trim();
   }
@@ -457,6 +511,7 @@
   function isFillable(el) {
     if (!el || isOurUI(el) || !isVisible(el) || el.disabled) return false;
     if (!el.matches(CONTROL_SEL)) return false;
+    if (insideDropdownMenu(el)) return false;
     const type = (el.getAttribute("type") || "").toLowerCase();
     if (SKIP_TYPES.has(type)) return false;
     if (!isFieldSized(el)) return false;
@@ -512,10 +567,16 @@
   function buildLocator(el) {
     const label = getLabel(el);
     const strategies = [];
-    if (el.id) strategies.push({ type: "id", value: el.id });
+    const id = uniqueId(el);
+    if (id) strategies.push({ type: "id", value: id });
     if (el.getAttribute("name")) strategies.push({ type: "name", value: el.getAttribute("name") });
     if (el.getAttribute("aria-label")) strategies.push({ type: "aria", value: el.getAttribute("aria-label") });
-    if (label) strategies.push({ type: "label", value: label });
+    if (label) {
+      strategies.push({ type: "label", value: label });
+      if (el.closest('[class*="EditAttributeItemWrapper"]')) {
+        strategies.unshift({ type: "fk-attr", value: label });
+      }
+    }
     if (el.getAttribute("placeholder")) strategies.push({ type: "placeholder", value: el.getAttribute("placeholder") });
     strategies.push({ type: "css", value: cssPath(el) });
     strategies.push({ type: "xpath", value: xpathOf(el) });
@@ -536,6 +597,21 @@
     } catch {
       return null;
     }
+  }
+
+  function byFlipkartAttribute(label) {
+    if (!label) return null;
+    const want = String(label).replace(/\s+/g, " ").trim().toLowerCase();
+    const names = document.querySelectorAll('[class*="AttributeItemLabelName"]');
+    for (const name of names) {
+      const got = cleanLabel(textOf(name)).replace(/\s+/g, " ").trim().toLowerCase();
+      if (got !== want) continue;
+      const wrap = name.closest('[class*="AttributeWrapper"]') || name.closest('[class*="EditAttributeItemWrapper"]');
+      if (!wrap) continue;
+      const control = wrap.querySelector('[role="combobox"], input, textarea, select');
+      if (control && isVisible(control) && !isOurUI(control)) return control;
+    }
+    return null;
   }
 
   function byLabel(label) {
@@ -560,21 +636,34 @@
     const strategies = locator.strategies || [];
     for (const s of strategies) {
       let el = null;
-      if (s.type === "id") el = document.getElementById(s.value);
+      if (s.type === "id") {
+        try {
+          if (document.querySelectorAll(`[id="${CSS.escape(s.value)}"]`).length !== 1) el = null;
+          else el = document.getElementById(s.value);
+        } catch {
+          el = document.getElementById(s.value);
+        }
+      }
       else if (s.type === "name") el = document.querySelector(`[name="${CSS.escape(s.value)}"]`);
       else if (s.type === "aria") el = document.querySelector(`[aria-label="${CSS.escape(s.value)}"]`);
       else if (s.type === "placeholder") el = document.querySelector(`[placeholder="${CSS.escape(s.value)}"]`);
       else if (s.type === "css") {
         try {
-          el = document.querySelector(s.value);
+          const idOnly = s.value.startsWith("#") && !/[ >+~]/.test(s.value);
+          if (idOnly && document.querySelectorAll(`[id="${CSS.escape(s.value.slice(1))}"]`).length !== 1) el = null;
+          else el = document.querySelector(s.value);
         } catch {
           el = null;
         }
-      } else if (s.type === "xpath") el = queryXPath(s.value);
+      } else if (s.type === "xpath") {
+        const idMatch = /^\/\/\*\[@id="([^"]+)"\]$/.exec(s.value || "");
+        if (idMatch && document.querySelectorAll(`[id="${CSS.escape(idMatch[1])}"]`).length !== 1) el = null;
+        else el = queryXPath(s.value);
+      } else if (s.type === "fk-attr") el = byFlipkartAttribute(s.value);
       else if (s.type === "label") el = byLabel(s.value);
       if (el && isVisible(el) && !isOurUI(el)) return el;
     }
-    return byLabel(locator.label);
+    return byFlipkartAttribute(locator.label) || byLabel(locator.label);
   }
 
   function resolveField(field) {
@@ -586,7 +675,7 @@
     }
     const el = resolveLocator(field.locator);
     if (el) return el;
-    return byLabel(field.label);
+    return byFlipkartAttribute(field.label) || byLabel(field.label);
   }
 
   window.LFLocator = {

@@ -48,7 +48,7 @@ function initialsFrom(name) {
     .trim()
     .split(/\s+/)
     .filter(Boolean);
-  if (!parts.length) return "LF";
+  if (!parts.length) return "LP";
   return parts
     .slice(0, 2)
     .map((p) => p[0].toUpperCase())
@@ -109,7 +109,7 @@ function bindContactLinks() {
   const mail = $("contact-email");
   const tel = $("contact-phone");
   if (mail) {
-    mail.href = `mailto:${email}?subject=${encodeURIComponent("ListFill Pro license")}`;
+    mail.href = `mailto:${email}?subject=${encodeURIComponent("List Pilot Pro license")}`;
     mail.textContent = email;
   }
   if (tel) {
@@ -196,7 +196,7 @@ async function sendToTab(message) {
   }
   try {
     await chrome.scripting.executeScript({
-      target: { tabId: listingTab.id },
+      target: { tabId: listingTab.id, allFrames: true },
       files: ["src/locator.js"]
     });
   } catch {
@@ -206,11 +206,11 @@ async function sendToTab(message) {
     return await chrome.tabs.sendMessage(listingTab.id, message);
   } catch {
     await chrome.scripting.executeScript({
-      target: { tabId: listingTab.id },
+      target: { tabId: listingTab.id, allFrames: true },
       files: ["shared.js", "src/locator.js", "src/fill.js", "src/capture.js", "src/content.js"]
     });
     await chrome.scripting.insertCSS({
-      target: { tabId: listingTab.id },
+      target: { tabId: listingTab.id, allFrames: true },
       files: ["src/content.css"]
     });
     return await chrome.tabs.sendMessage(listingTab.id, message);
@@ -461,7 +461,8 @@ async function saveVariant() {
   else variants.push(LF.clone(draft));
   await LF.saveVariants(variants);
   await renderHome();
-  status("Variant saved. Edited values will be used on Autofill.");
+  await downloadBackup();
+  status("Variant saved. A backup JSON was downloaded.");
 }
 
 async function togglePin(id) {
@@ -504,7 +505,7 @@ async function fillVariant(id) {
     await renderHome();
     await LFLicense.recordFill();
     const missed = res.results?.failed?.length || 0;
-    status(`Filled ${res.results.filled} fields${missed ? `, ${missed} missed` : ""}.`);
+  status(`Filled ${res.results.filled} fields${missed ? `, ${missed} missed` : ""}. Review, then submit the listing yourself.`);
   } catch (err) {
     status(err.message || String(err), true);
   }
@@ -612,6 +613,26 @@ $("btn-new").addEventListener("click", async () => {
   await openEditor();
 });
 $("btn-save").addEventListener("click", saveVariant);
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  if (e.target instanceof HTMLTextAreaElement && !e.ctrlKey && !e.metaKey) return;
+  const wall = $("paywall");
+  if (wall && !wall.classList.contains("hidden")) {
+    e.preventDefault();
+    $("btn-activate")?.click();
+    return;
+  }
+  const manual = $("manual-box");
+  if (manual && !manual.classList.contains("hidden")) {
+    e.preventDefault();
+    $("manual-save")?.click();
+    return;
+  }
+  if ($("view-editor") && !$("view-editor").classList.contains("hidden")) {
+    e.preventDefault();
+    saveVariant();
+  }
+});
 $("btn-fill-current").addEventListener("click", fillCurrent);
 $("btn-capture").addEventListener("click", startCapture);
 $("btn-stop-capture").addEventListener("click", stopCapture);
@@ -670,7 +691,7 @@ $("manual-save").addEventListener("click", async () => {
   renderFields();
 });
 
-$("btn-export").addEventListener("click", async () => {
+async function downloadBackup() {
   const variants = await LF.getVariants();
   const blob = new Blob([JSON.stringify({ variants, exportedAt: new Date().toISOString() }, null, 2)], {
     type: "application/json"
@@ -678,9 +699,14 @@ $("btn-export").addEventListener("click", async () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "listfill-variants.json";
+    a.download = "listpilot-variants.json";
   a.click();
   URL.revokeObjectURL(url);
+}
+
+$("btn-export").addEventListener("click", async () => {
+  await downloadBackup();
+  status("Backup downloaded.");
 });
 $("btn-import").addEventListener("click", () => $("import-file").click());
 $("import-file").addEventListener("change", async (e) => {
