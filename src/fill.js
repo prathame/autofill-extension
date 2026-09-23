@@ -19,13 +19,24 @@
   }
 
   async function click(el) {
+    if (!el) return;
     el.scrollIntoView({ block: "center", inline: "nearest" });
-    await sleep(40);
-    el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }));
-    el.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, composed: true }));
-    el.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, composed: true }));
-    el.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, composed: true }));
-    el.click();
+    await sleep(50);
+    const r = el.getBoundingClientRect();
+    const opts = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+      clientX: Math.round(r.left + Math.min(24, r.width / 2)),
+      clientY: Math.round(r.top + r.height / 2)
+    };
+    el.dispatchEvent(new PointerEvent("pointerdown", opts));
+    el.dispatchEvent(new MouseEvent("mousedown", opts));
+    el.dispatchEvent(new PointerEvent("pointerup", opts));
+    el.dispatchEvent(new MouseEvent("mouseup", opts));
+    el.dispatchEvent(new MouseEvent("click", opts));
+    if (typeof el.click === "function") el.click();
   }
 
   function optionMatch(el, value) {
@@ -35,11 +46,19 @@
   }
 
   async function pickFromOpenList(value) {
-    await sleep(180);
+    await sleep(220);
     const options = [
-      ...document.querySelectorAll('[role="option"], li[data-value], .MuiMenuItem-root, [class*="MenuItem"], [class*="option"]')
-    ].filter((n) => LFLocator.isVisible(n) && !LFLocator.isOurUI(n));
-    const exact = options.find((o) => optionMatch(o, value) && (o.innerText || "").trim().toLowerCase() === String(value).trim().toLowerCase());
+      ...document.querySelectorAll(
+        '[role="option"], [role="menuitem"], li[data-value], .MuiMenuItem-root, [class*="MenuItem"], [class*="menu-item" i], [class*="dropdown-item" i], [class*="option"], [class*="Menu"] li, [class*="menu"] li, [class*="listbox"] li, ul[role="listbox"] li'
+      )
+    ].filter((n) => {
+      if (!LFLocator.isVisible(n) || LFLocator.isOurUI(n)) return false;
+      if (n.closest("nav, header, aside, [class*='sidebar' i]")) return false;
+      return true;
+    });
+    const exact = options.find(
+      (o) => optionMatch(o, value) && (o.innerText || "").trim().toLowerCase() === String(value).trim().toLowerCase()
+    );
     const fuzzy = options.find((o) => optionMatch(o, value));
     const hit = exact || fuzzy;
     if (hit) {
@@ -47,6 +66,14 @@
       return true;
     }
     return false;
+  }
+
+  function dropdownHost(el) {
+    return (
+      el.closest(
+        '[role="combobox"], [aria-haspopup="listbox"], [class*="MuiSelect"], [class*="Select"], [class*="select"], [class*="dropdown" i]'
+      ) || el
+    );
   }
 
   async function fillSelect(el, value) {
@@ -63,17 +90,23 @@
       return true;
     }
 
-    await click(el);
+    const host = dropdownHost(el);
+    await click(host);
+    const arrow = [...(host.parentElement || host).querySelectorAll("svg, [class*='arrow' i], [class*='caret' i], [class*='chevron' i]")].find(
+      (n) => LFLocator.isVisible(n) && n.getBoundingClientRect().width < 48
+    );
+    if (arrow && arrow !== host) await click(arrow);
     if (await pickFromOpenList(value)) return true;
 
-    const input = el.tagName === "INPUT" ? el : el.querySelector("input") || document.activeElement;
+    const input = host.tagName === "INPUT" ? host : host.querySelector("input") || el;
     if (input && (input.tagName === "INPUT" || input.getAttribute("role") === "combobox")) {
       setReactValue(input, value);
-      await sleep(160);
+      await sleep(200);
       if (await pickFromOpenList(value)) return true;
-      input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
-      await sleep(80);
-      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+      await sleep(120);
+      if (await pickFromOpenList(value)) return true;
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
       return true;
     }
     return false;

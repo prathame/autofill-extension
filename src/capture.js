@@ -5,6 +5,34 @@
   let ring = null;
   let banner = null;
   let dialog = null;
+  let pendingDropdown = null;
+
+  function dropdownField(el) {
+    if (!el) return false;
+    if (typeof LFLocator.looksLikeDropdown === "function" && LFLocator.looksLikeDropdown(el)) return true;
+    return LFLocator.fieldKind(el, LFLocator.getLabel(el)) === "select";
+  }
+
+  function optionTextFromEvent(e) {
+    const path = e.composedPath ? e.composedPath() : [];
+    for (const node of path) {
+      if (!(node instanceof Element)) continue;
+      if (LFLocator.isOurUI(node)) return "";
+      if (
+        node.matches(
+          '[role="option"], [role="menuitem"], [class*="MenuItem"], [class*="menu-item" i], [class*="dropdown-item" i], [class*="option"], li[data-value], li'
+        )
+      ) {
+        const t = LFLocator.textOf(node);
+        if (t && t.length < 80 && !/^(select|choose|pick)$/i.test(t)) return t;
+      }
+    }
+    if (e.target instanceof Element && !LFLocator.isOurUI(e.target)) {
+      const t = LFLocator.textOf(e.target);
+      if (t && t.length > 1 && t.length < 80 && !/^(select|choose|pick)$/i.test(t)) return t;
+    }
+    return "";
+  }
 
   function root() {
     let el = document.getElementById(ROOT_ID);
@@ -75,7 +103,7 @@
         <strong>ListFill · capturing</strong>
         <span class="lf-panel-hint">Drag to move</span>
       </div>
-      <p class="lf-banner-count">Click fields on the form. Size first.</p>
+      <p class="lf-banner-count">Click fields on the form. For dropdowns, open the list and pick a value.</p>
       <div class="lf-panel-fields" data-lf="fields"></div>
       <div class="lf-panel-actions">
         <button type="button" class="lf-btn lf-btn-ghost" data-lf="stop">Stop capture</button>
@@ -174,12 +202,16 @@
     return (draft && draft.fields && draft.fields.length) || 0;
   }
 
-  function showDialog(el) {
+  function showDialog(el, presetValue) {
     closeDialog();
     const locator = LFLocator.buildLocator(el);
     const label = locator.label || LFLocator.textOf(el) || "Untitled field";
     const kind = LFLocator.fieldKind(el, label);
-    const current = kind === "size" && !el.value ? LFLocator.textOf(el) : LFLocator.readValue(el);
+    let current = presetValue;
+    if (current == null || current === "") {
+      current = kind === "size" && !el.value ? LFLocator.textOf(el) : LFLocator.readValue(el);
+    }
+    if (/^(select|choose|pick)$/i.test(String(current || "").trim())) current = "";
 
     dialog = document.createElement("div");
     dialog.className = "lf-dialog";
@@ -264,8 +296,30 @@
   function onClick(e) {
     if (!active) return;
     if (LFLocator.isOurUI(e.target)) return;
+
+    if (pendingDropdown) {
+      const path = e.composedPath ? e.composedPath() : [];
+      const onSame =
+        path.includes(pendingDropdown) ||
+        (e.target instanceof Element && pendingDropdown.contains(e.target));
+      if (onSame) return;
+      const picked = optionTextFromEvent(e);
+      if (picked) {
+        const fieldEl = pendingDropdown;
+        pendingDropdown = null;
+        setTimeout(() => showDialog(fieldEl, picked), 120);
+      }
+      return;
+    }
+
     const el = targetFromEvent(e) || hoverEl;
     if (!el) return;
+
+    if (dropdownField(el)) {
+      pendingDropdown = el;
+      return;
+    }
+
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
@@ -299,6 +353,7 @@
   async function stopCapture() {
     active = false;
     hoverEl = null;
+    pendingDropdown = null;
     hideRing();
     closeDialog();
     if (banner) {
