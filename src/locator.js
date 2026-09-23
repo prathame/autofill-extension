@@ -379,6 +379,8 @@
 
     const ph = (el.getAttribute("placeholder") || el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
     if (/^(select|choose|pick)\b/.test(ph)) return true;
+    const shown = textOf(el).toLowerCase();
+    if (/^(select|choose|pick)$/.test(shown)) return true;
 
     const type = (el.getAttribute("type") || "text").toLowerCase();
     if (el.tagName === "INPUT" && (type === "text" || type === "search" || !type) && el.readOnly) return true;

@@ -18,7 +18,7 @@
     el.dispatchEvent(new Event("blur", { bubbles: true }));
   }
 
-  async function click(el) {
+  async function click(el, at) {
     if (!el) return;
     el.scrollIntoView({ block: "center", inline: "nearest" });
     await sleep(50);
@@ -28,8 +28,8 @@
       cancelable: true,
       composed: true,
       view: window,
-      clientX: Math.round(r.left + Math.min(24, r.width / 2)),
-      clientY: Math.round(r.top + r.height / 2)
+      clientX: Math.round(at?.x ?? r.left + Math.min(24, r.width / 2)),
+      clientY: Math.round(at?.y ?? r.top + r.height / 2)
     };
     el.dispatchEvent(new PointerEvent("pointerdown", opts));
     el.dispatchEvent(new MouseEvent("mousedown", opts));
@@ -91,7 +91,8 @@
     }
 
     const host = dropdownHost(el);
-    await click(host);
+    const box = host.getBoundingClientRect();
+    await click(host, { x: box.right - 14, y: box.top + box.height / 2 });
     const arrow = [...(host.parentElement || host).querySelectorAll("svg, [class*='arrow' i], [class*='caret' i], [class*='chevron' i]")].find(
       (n) => LFLocator.isVisible(n) && n.getBoundingClientRect().width < 48
     );

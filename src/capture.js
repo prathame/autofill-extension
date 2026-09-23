@@ -293,6 +293,13 @@
     else hideRing();
   }
 
+  function onMouseDown(e) {
+    if (!active) return;
+    if (LFLocator.isOurUI(e.target)) return;
+    const el = targetFromEvent(e) || hoverEl;
+    if (el && dropdownField(el)) pendingDropdown = el;
+  }
+
   function onClick(e) {
     if (!active) return;
     if (LFLocator.isOurUI(e.target)) return;
@@ -307,7 +314,7 @@
       if (picked) {
         const fieldEl = pendingDropdown;
         pendingDropdown = null;
-        setTimeout(() => showDialog(fieldEl, picked), 120);
+        setTimeout(() => showDialog(fieldEl, picked), 150);
       }
       return;
     }
@@ -344,6 +351,7 @@
     showBanner();
     updateBannerCount(await fieldCount());
     document.addEventListener("mousemove", onMove, true);
+    document.addEventListener("mousedown", onMouseDown, true);
     document.addEventListener("click", onClick, true);
     document.addEventListener("keydown", onKey, true);
     await LF.set(LF.STORAGE.CAPTURE, { active: true, startedAt: Date.now() });
@@ -361,6 +369,7 @@
       banner = null;
     }
     document.removeEventListener("mousemove", onMove, true);
+    document.removeEventListener("mousedown", onMouseDown, true);
     document.removeEventListener("click", onClick, true);
     document.removeEventListener("keydown", onKey, true);
     await LF.set(LF.STORAGE.CAPTURE, { active: false });
