@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 import { createHmac } from "crypto";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
-const root = dirname(fileURLToPath(import.meta.url));
-const cfg = readFileSync(join(root, "..", "license-config.js"), "utf8");
-const secret = cfg.match(/signingSecret:\s*"([^"]+)"/)?.[1];
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const secretFile = join(root, "server", "signing.secret");
+const secret = process.env.SIGNING_SECRET || (existsSync(secretFile) ? readFileSync(secretFile, "utf8").trim() : "");
 if (!secret || secret.includes("change-this")) {
-  console.error("Set a unique signingSecret in license-config.js before issuing keys.");
+  console.error("Set SIGNING_SECRET or create server/signing.secret before issuing keys.");
   process.exit(1);
 }
 

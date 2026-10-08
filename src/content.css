@@ -19,16 +19,27 @@
   display: none;
 }
 
-.lf-banner,
+.lf-dialog,
 .lf-progress,
 .lf-toast,
-.lf-dialog,
 .lf-panel {
   position: fixed;
+  inset: unset;
+  margin: 0;
   z-index: 2147483646;
   color: #eef2f7;
   background: #121a2b;
   border: 1px solid #243049;
+}
+
+.lf-dialog:popover-open,
+.lf-panel:popover-open,
+.lf-toast:popover-open,
+.lf-progress:popover-open {
+  position: fixed;
+  inset: unset;
+  margin: 0;
+  z-index: 2147483647;
 }
 
 .lf-panel {
@@ -130,7 +141,9 @@
 }
 
 .lf-dialog {
-  position: absolute;
+  position: fixed;
+  inset: unset;
+  margin: 0;
   width: 320px;
   padding: 14px;
   border-radius: 12px;

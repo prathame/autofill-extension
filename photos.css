@@ -1,0 +1,28 @@
+html.photos-page,
+body.photos-page {
+  width: auto;
+  min-height: 100%;
+  max-height: none;
+  overflow: auto;
+}
+
+body.photos-page .app {
+  height: auto;
+  min-height: 100vh;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+body.photos-page .body {
+  padding-bottom: 40px;
+}
+
+body.photos-page .photo-list {
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 640px) {
+  body.photos-page .photo-list {
+    grid-template-columns: 1fr;
+  }
+}

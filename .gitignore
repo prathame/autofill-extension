@@ -4,3 +4,4 @@
 *.zip
 node_modules/
 server/data/
+server/signing.secret

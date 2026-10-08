@@ -1,6 +1,6 @@
-# ListFill for Meesho & Flipkart
+# List Pilot for Meesho & Flipkart
 
-Independent Chrome extension that saves reusable product variants and autofills **Meesho** and **Flipkart Seller Hub** listing forms. You still review and submit the catalog yourself.
+Independent Chrome extension that saves reusable product variants and autofills **Meesho** and **Flipkart Seller Hub** listing forms. Optional add-ons (Account → toggles): listing-ready photos, and a Meesho monthly P&L report. You still review and submit the catalog yourself.
 
 This is not affiliated with Meesho or Flipkart.
 
@@ -9,20 +9,40 @@ This is not affiliated with Meesho or Flipkart.
 1. Open `chrome://extensions`
 2. Enable **Developer mode**
 3. Click **Load unpacked** and select this folder (the one with `manifest.json`, not `node_modules`)
-4. Pin **ListFill**
+4. Pin **List Pilot**
 
 On **Meesho**, open the supplier Add Product page. On **Flipkart**, open Seller Hub (`seller.flipkart.com`) → Listings → Add a Single Listing. The pill should say Meesho Ready or Flipkart Ready.
 
 Practice page: `python3 -m http.server 8787` then open http://127.0.0.1:8787/demo/
 
+## Add-ons
+
+Both are **off until you enable them** in the popup **Account** tab. That keeps the default UI as Variants / Preset / Account.
+
+### Photo kit
+
+Turn on **Listing photo kit**. Popup → **Photos** (or `photos.html`). Pick Meesho (1080×1080), Flipkart (1500×1500), or Both. Drop JPG/PNG/WebP. List Pilot redraws on a canvas so EXIF is stripped, compresses JPEG under the size cap, and can pad onto a white square. It does **not** cut a busy background off the product.
+
+### Meesho P&L report
+
+Turn on **Meesho P&L report**. Popup → **P&L** (or `payouts.html`). Upload three files, all processed in the browser:
+
+1. Meesho **Orders** CSV for the month
+2. **Payments → Download → Payments to Date** zip for that same month (do not unzip)
+3. The **next month’s** Payments to Date zip (at least ~15 days), so delayed settlements are not treated as unpaid
+
+Then enter **product + packaging cost per SKU**. Profit is settlement + recovery + referral − ads − product − pack − misc, then output GST and ITC. Listed price and GMV are not profit. Cancelled rows are excluded from net orders. Exchange rows count pack cost twice.
+
+Trial can build the report; after trial, CSV export needs Pro. This is not GST filing and it does not log into the seller panel.
+
 ## Free install + paid subscription
 
-The Chrome Web Store listing is **free to install**. Autofill is free for **5 days**, then needs Pro.
+The Chrome Web Store listing is **free to install**. Autofill, photo downloads, and P&L CSV export are free for **5 days**, then need Pro.
 
 | Free trial | Pro |
 |---|---|
-| Capture fields, save variants | Everything in trial |
-| 5 days of Autofill | Unlimited Autofill until the key expires |
+| Capture fields, save variants, photo kit, Meesho P&L | Everything in trial |
+| 5 days of Autofill, photo downloads, and P&L export | Unlimited until the key expires |
 | Data stays in the browser | Same, plus a license key |
 
 Chrome does **not** bill subscriptions for you anymore. You take payment outside the store (Razorpay is the usual choice in India), then send the seller a license key.
@@ -45,7 +65,7 @@ Copy the **admin token** it prints. Then open [http://127.0.0.1:8787/admin/](htt
 1. Paste the admin token
 2. Type the **customer name** (shop / person)
 3. Pick Monthly / Yearly / Lifetime → **Issue key** → **Copy key**
-4. Customer pastes it in ListFill → Activate
+4. Customer pastes it in List Pilot → Activate
 
 Look up later by **name** or by key. Click a row in the issued list to copy that key into lookup.
 
@@ -53,9 +73,9 @@ The first computer that activates **owns** that key. A second computer gets: “
 
 If the seller gets a new laptop, paste their key in the admin page and click **Reset device**. **Revoke** kills the key for everyone.
 
-Keep `licenseServerUrl` in `license-config.js` pointed at this server (live: `https://autofill-extension.onrender.com`).
+Keep `licenseServerUrl` in `license-config.js` pointed at this server (live: `https://autofill-extension.onrender.com`). Put `SIGNING_SECRET` on Render so the HMAC secret is not inside the Chrome zip.
 
-Paste that key to the customer. They open ListFill → Upgrade → **Activate**.
+Paste that key to the customer. They open List Pilot → Upgrade → **Activate**.
 
 ### 3. Host the license server (Render + Neon)
 
@@ -71,6 +91,7 @@ Postgres is only used to remember **which keys you issued** and **which computer
    - Health check: `/health`
 4. Environment:
    - `DATABASE_URL` = the Neon URI
+   - `SIGNING_SECRET` = HMAC secret used to issue keys (server only; never ship this in the extension zip)
    - `LICENSE_ADMIN_TOKEN` = a long random string (save this; you need it to issue keys)
    - `MAX_DEVICES` = `1`
 5. After deploy, open `https://autofill-extension.onrender.com/health` — it should show `"persist":"postgres"`
@@ -85,12 +106,12 @@ Postgres is only used to remember **which keys you issued** and **which computer
 
 ```bash
 cd /Users/apple/mesho
-zip -r ../listfill.zip . -x "*.git*" -x "tools/*" -x ".DS_Store"
+zip -r ../list-pilot.zip . -x "*.git*" -x "tools/*" -x ".DS_Store"
 ```
 
-4. Dashboard → **New item** → upload `listfill.zip`
+4. Dashboard → **New item** → upload `list-pilot.zip`
 5. Store listing:
-   - Name: ListFill for Meesho
+   - Name: List Pilot for Meesho & Flipkart
    - Summary: Save variants and autofill the Meesho Add Product form
    - Say it is **unofficial** and not affiliated with Meesho
    - Category: Productivity / Tools

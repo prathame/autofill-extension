@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ListFill - Smart Listing Autofill Assistant</title>
+    <title>List Pilot</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
@@ -12,14 +12,11 @@
         <div class="hdr-row">
           <div class="brand">
             <div class="brand-mark">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="m5 12 5 5L20 7"></path>
-                <path d="M12 20h8"></path>
-              </svg>
+              <img src="icons/icon48.png" alt="" width="28" height="28" />
             </div>
             <div>
               <div class="brand-name">
-                ListFill
+                List Pilot
                 <span id="plan-badge" class="pro" title="Open account">TRIAL</span>
               </div>
               <p class="brand-sub">Meesho &amp; Flipkart listing autofill</p>
@@ -45,6 +42,8 @@
           <button id="tab-editor" class="tab tab-on" type="button">
             <span class="dot"></span> Preset
           </button>
+          <button id="tab-photos" class="tab hidden" type="button">Photos</button>
+          <button id="tab-payouts" class="tab hidden" type="button">P&amp;L</button>
           <button id="tab-account" class="tab" type="button">Account</button>
         </nav>
       </header>
@@ -74,6 +73,7 @@
                 </label>
                 <span id="sku-preview" class="badge hidden">Next: —</span>
               </div>
+              <p class="sku-hint">One variant per product type. Turn this on so Seller SKU ID changes on every Autofill.</p>
               <div id="sku-row" class="sku-grid hidden">
                 <div>
                   <span class="tiny">Prefix</span>
@@ -139,9 +139,12 @@
           <div id="field-list" class="stack"></div>
         </section>
 
+        <section id="view-photos" class="view hidden"></section>
+        <section id="view-payouts" class="view hidden"></section>
+
         <section id="view-account" class="view hidden">
           <section class="card profile-hero">
-            <div id="profile-initials" class="profile-avatar">LF</div>
+            <div id="profile-initials" class="profile-avatar">LP</div>
             <div>
               <div id="profile-name" class="brand-name">Your account</div>
               <p id="profile-status" class="brand-sub">Checking subscription…</p>
@@ -155,6 +158,21 @@
             <div class="kv"><span>Time left</span><strong id="profile-left">—</strong></div>
             <div class="kv"><span>Autofills used</span><strong id="profile-fills">0</strong></div>
             <div class="kv"><span>License</span><strong id="profile-key" class="mono">—</strong></div>
+            <p class="account-note">Trial works offline. Pro keys need the license server. If activate fails, wait 30 seconds (free hosting sleeps) and try again. Keys stay bound to this computer for 48 hours if the server is down after a successful check.</p>
+          </section>
+          <section class="card">
+            <p class="section-label">Add-ons</p>
+            <p class="account-note">Off until you turn them on. Tabs stay hidden so the popup stays listing-only.</p>
+            <label class="check addon-toggle">
+              <input id="addon-photos" type="checkbox" />
+              <span>Listing photo kit</span>
+            </label>
+            <p class="addon-hint">Resize, compress, strip EXIF, optional white square.</p>
+            <label class="check addon-toggle">
+              <input id="addon-payouts" type="checkbox" />
+              <span>Meesho P&amp;L report</span>
+            </label>
+            <p class="addon-hint">Monthly profit from orders CSV + Payments to Date zips + SKU costs. No seller login.</p>
           </section>
           <button id="btn-profile-upgrade" class="btn-glow" type="button">Upgrade to Pro</button>
           <button id="btn-profile-key" class="btn-ghost" type="button">Activate or change license key</button>
@@ -170,24 +188,24 @@
             </svg>
             Autofill listing page
           </button>
-          <button id="btn-save" class="btn-save" type="button">Save</button>
+          <button id="btn-save" class="btn-save" type="button" title="Enter">Save</button>
         </div>
         <div class="ftr-utils">
           <div>
-            <button id="btn-export" class="link" type="button">Export</button>
+            <button id="btn-export" class="link" type="button">Export backup</button>
             <span class="sep">|</span>
             <button id="btn-import" class="link" type="button">Import</button>
             <input id="import-file" type="file" accept="application/json" hidden />
           </div>
-          <span class="ver">v1.3.0 · Safe local storage</span>
+          <span class="ver">v1.8.0 · Safe local storage</span>
         </div>
         <p class="disclaimer">Independent supplier assistant for Meesho and Flipkart. All form data stays in your browser. You still submit the catalog yourself.</p>
       </footer>
     </div>
     <div id="paywall" class="paywall hidden">
       <div class="paywall-card">
-        <h2>Continue with ListFill Pro</h2>
-        <p class="hint-center">Install is free. After the 5-day trial, Autofill needs a subscription. Capture and saved variants stay on this computer.</p>
+        <h2>Continue with List Pilot Pro</h2>
+        <p class="hint-center">Install is free. After the 5-day trial, Autofill, photo downloads, and payout CSV export need a subscription. Capture and saved variants stay on this computer. Trial works while the license server is asleep; activating a Pro key needs the server awake.</p>
         <p id="pay-price" class="price">₹199 / month</p>
         <p id="pay-year" class="muted tiny">₹1,499 / year</p>
         <p class="hint-center">Contact admin for a license key</p>
@@ -207,6 +225,9 @@
     <script src="shared.js"></script>
     <script src="license-config.js"></script>
     <script src="src/license.js"></script>
+    <script src="src/photos.js"></script>
+    <script src="src/pnl.js"></script>
+    <script src="src/payouts.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

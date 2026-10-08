@@ -1,0 +1,26 @@
+List Pilot v1.8.0 — install on Chrome (Windows, Mac, Linux)
+
+1. Unzip this folder.
+2. Open Chrome and go to: chrome://extensions
+3. Turn on Developer mode (top right).
+4. Click "Load unpacked".
+5. Select this unzipped folder (the one that contains manifest.json).
+6. Pin List Pilot.
+7. Open a Meesho Add Product page or Flipkart Seller Hub → Add a Single Listing.
+8. The popup pill should say Meesho Ready or Flipkart Ready.
+
+Capture: click "Pick fields on live page", then click each form field.
+Flipkart dropdowns: open the list and click the value — it saves into the capturing panel.
+Then Save variant. Autofill on the next listing. You still submit the catalog yourself.
+List Pilot never clicks Send to QC / Submit.
+
+Add-ons (Account tab, off until you enable them):
+- Listing photo kit → Photos tab. Drop shots → Meesho 1080 / Flipkart 1500 / Both. Compress, strip EXIF, optional white square.
+- Meesho P&L → P&L tab. Upload month orders CSV, that month’s Payments to Date zip (do not unzip), then next month’s zip. Enter SKU product + pack cost. Files stay in the browser.
+
+Trial is 5 days and works even if the license server is asleep.
+Pro keys need https://autofill-extension.onrender.com — wait ~30s if the first activate fails, then try again.
+
+Export backup from the popup footer so you do not lose variants.
+
+Support: prathameshbusa@gmail.com · 8806907616

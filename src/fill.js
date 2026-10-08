@@ -3,6 +3,16 @@
     return new Promise((r) => setTimeout(r, ms));
   }
 
+  function isListingSubmit(el) {
+    if (!el || el.nodeType !== 1) return false;
+    const type = (el.getAttribute("type") || "").toLowerCase();
+    if (type === "submit") return true;
+    const blob = `${el.getAttribute("aria-label") || ""} ${el.getAttribute("title") || ""} ${el.innerText || ""}`
+      .toLowerCase()
+      .replace(/\s+/g, " ");
+    return /send to qc|submit listing|submit product|publish listing|save and submit/.test(blob);
+  }
+
   function nativeSetter(el) {
     if (el.tagName === "TEXTAREA") return Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
     return Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
@@ -18,35 +28,90 @@
     el.dispatchEvent(new Event("blur", { bubbles: true }));
   }
 
-  async function click(el) {
+  async function click(el, at) {
+    if (!el || isListingSubmit(el)) return;
     el.scrollIntoView({ block: "center", inline: "nearest" });
-    await sleep(40);
-    el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }));
-    el.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, composed: true }));
-    el.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, composed: true }));
-    el.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, composed: true }));
-    el.click();
+    await sleep(50);
+    const r = el.getBoundingClientRect();
+    const opts = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+      clientX: Math.round(at?.x ?? r.left + Math.min(24, r.width / 2)),
+      clientY: Math.round(at?.y ?? r.top + r.height / 2)
+    };
+    el.dispatchEvent(new PointerEvent("pointerdown", opts));
+    el.dispatchEvent(new MouseEvent("mousedown", opts));
+    el.dispatchEvent(new PointerEvent("pointerup", opts));
+    el.dispatchEvent(new MouseEvent("mouseup", opts));
+    el.dispatchEvent(new MouseEvent("click", opts));
+    if (typeof el.click === "function") el.click();
   }
 
   function optionMatch(el, value) {
     const want = String(value).trim().toLowerCase();
+    const data = (el.getAttribute("data-label") || "").replace(/\s+/g, " ").trim().toLowerCase();
     const t = (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-    return t === want || t.includes(want);
+    return data === want || t === want || (data && data.includes(want)) || t.includes(want);
   }
 
-  async function pickFromOpenList(value) {
-    await sleep(180);
+  async function pickFromOpenList(value, root) {
+    await sleep(220);
+    const scope = root || document;
     const options = [
-      ...document.querySelectorAll('[role="option"], li[data-value], .MuiMenuItem-root, [class*="MenuItem"], [class*="option"]')
-    ].filter((n) => LFLocator.isVisible(n) && !LFLocator.isOurUI(n));
-    const exact = options.find((o) => optionMatch(o, value) && (o.innerText || "").trim().toLowerCase() === String(value).trim().toLowerCase());
+      ...scope.querySelectorAll(
+        '[role="option"], [role="menuitem"], [class*="CheckMarkOptionWrapper"], input[type="radio"][data-label], li[data-value], .MuiMenuItem-root, [class*="MenuItem"], [class*="menu-item" i], [class*="dropdown-item" i], [class*="option"], [class*="Menu"] li, [class*="menu"] li, [class*="listbox"] li, ul[role="listbox"] li, [popover] label'
+      )
+    ].filter((n) => {
+      if (!LFLocator.isVisible(n) || LFLocator.isOurUI(n)) return false;
+      if (n.closest("nav, header, aside, [class*='sidebar' i]")) return false;
+      const t = (n.getAttribute("data-label") || n.innerText || "").replace(/\s+/g, " ").trim();
+      if (/^select one$/i.test(t) && !/^select one$/i.test(String(value).trim())) return false;
+      return true;
+    });
+    const want = String(value).trim().toLowerCase();
+    const exact = options.find((o) => {
+      const data = (o.getAttribute("data-label") || "").trim().toLowerCase();
+      const t = (o.innerText || "").trim().toLowerCase();
+      return data === want || t === want;
+    });
     const fuzzy = options.find((o) => optionMatch(o, value));
     const hit = exact || fuzzy;
     if (hit) {
-      await click(hit);
+      const clickable =
+        hit.closest('[class*="CheckMarkOptionWrapper"]') ||
+        hit.closest("label") ||
+        hit;
+      await click(clickable);
       return true;
     }
     return false;
+  }
+
+  function dropdownHost(el) {
+    return (
+      el.closest(
+        '[role="combobox"], [aria-haspopup="listbox"], [class*="MuiSelect"], [class*="Select"], [class*="select"], [class*="dropdown" i]'
+      ) || el
+    );
+  }
+
+  function flipkartSelectBox(el) {
+    return el.closest('[class*="SingleSelectContainer"]') || null;
+  }
+
+  function openPopoverIn(box) {
+    if (!box) return null;
+    const pop = box.querySelector("[popover], [data-testid='content-single-select']");
+    if (pop && typeof pop.showPopover === "function") {
+      try {
+        pop.showPopover();
+      } catch {
+        /* already open */
+      }
+    }
+    return pop;
   }
 
   async function fillSelect(el, value) {
@@ -63,17 +128,34 @@
       return true;
     }
 
-    await click(el);
-    if (await pickFromOpenList(value)) return true;
+    const box = flipkartSelectBox(el);
+    const host = (box && box.querySelector('[role="combobox"]')) || dropdownHost(el);
+    const rect = host.getBoundingClientRect();
+    await click(host, { x: rect.right - 14, y: rect.top + rect.height / 2 });
+    const pop = openPopoverIn(box);
+    const arrow = [...(host.parentElement || host).querySelectorAll("svg, [class*='arrow' i], [class*='caret' i], [class*='chevron' i]")].find(
+      (n) => LFLocator.isVisible(n) && n.getBoundingClientRect().width < 48
+    );
+    if (arrow && arrow !== host) await click(arrow);
 
-    const input = el.tagName === "INPUT" ? el : el.querySelector("input") || document.activeElement;
-    if (input && (input.tagName === "INPUT" || input.getAttribute("role") === "combobox")) {
-      setReactValue(input, value);
+    const search = (box || host).querySelector('input[aria-label="Search"], input[placeholder="Select"]');
+    if (search && search.closest("[popover], [data-testid='content-single-select']")) {
+      setReactValue(search, String(value));
       await sleep(160);
-      if (await pickFromOpenList(value)) return true;
-      input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
-      await sleep(80);
-      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    }
+
+    const pickRoot = pop || box || document;
+    if (await pickFromOpenList(value, pickRoot)) return true;
+    if (pickRoot !== document && (await pickFromOpenList(value))) return true;
+
+    if (host.tagName === "INPUT") {
+      setReactValue(host, value);
+      await sleep(200);
+      if (await pickFromOpenList(value, pickRoot)) return true;
+      host.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+      await sleep(120);
+      if (await pickFromOpenList(value, pickRoot)) return true;
+      host.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
       return true;
     }
     return false;
@@ -117,8 +199,9 @@
     const kind = field.kind || LFLocator.fieldKind(el, field.label);
 
     if (kind === "file" || (el.getAttribute("type") || "").toLowerCase() === "file") return false;
+    if (isListingSubmit(el)) return false;
     if (kind === "checkbox" || kind === "radio") return fillCheckbox(el, value);
-    if (kind === "select" || el.tagName === "SELECT" || el.getAttribute("role") === "combobox") {
+    if (kind === "select" || el.tagName === "SELECT" || el.getAttribute("role") === "combobox" || LFLocator.looksLikeDropdown?.(el)) {
       return fillSelect(el, value);
     }
     if (kind === "size" && (el.tagName === "BUTTON" || el.getAttribute("role") === "button" || LFLocator.looksLikeSizeChip(el))) {

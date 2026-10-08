@@ -1,0 +1,11 @@
+body.photos-page .app {
+  max-width: 880px;
+}
+
+body.photos-page .pay-kpis {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+body.photos-page .pay-row {
+  grid-template-columns: 1.4fr 1fr 1.2fr;
+}

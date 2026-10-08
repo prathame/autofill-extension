@@ -76,7 +76,7 @@
           ? `<div class="lf-toast-fail">${results.failed.map((f) => `${f.label}: ${f.reason}`).join("<br>")}</div>`
           : "";
         toast(
-          `<strong>Autofill done</strong><div>Filled ${results.filled} field${results.filled === 1 ? "" : "s"}${results.failed.length ? `, ${results.failed.length} missed` : ""}.</div>${fail}`,
+          `<strong>Autofill done</strong><div>Filled ${results.filled} field${results.filled === 1 ? "" : "s"}${results.failed.length ? `, ${results.failed.length} missed` : ""}. Review the form, then submit it yourself.</div>${fail}`,
           results.failed.length ? "warn" : "ok"
         );
         sendResponse({ ok: true, results });

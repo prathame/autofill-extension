@@ -5,6 +5,34 @@
   let ring = null;
   let banner = null;
   let dialog = null;
+  let pendingDropdown = null;
+
+  function dropdownField(el) {
+    if (!el) return false;
+    if (typeof LFLocator.looksLikeDropdown === "function" && LFLocator.looksLikeDropdown(el)) return true;
+    return LFLocator.fieldKind(el, LFLocator.getLabel(el)) === "select";
+  }
+
+  function optionTextFromEvent(e) {
+    const path = e.composedPath ? e.composedPath() : [];
+    const skip = /^(select|choose|pick|select one|reset)$/i;
+    for (const node of path) {
+      if (!(node instanceof Element)) continue;
+      if (LFLocator.isOurUI(node)) return "";
+      if (node.matches("input[type='text'], input[type='search'], textarea")) continue;
+      const dataLabel = (node.getAttribute("data-label") || "").trim();
+      if (dataLabel && !skip.test(dataLabel)) return dataLabel;
+      if (
+        node.matches(
+          '[role="option"], [role="menuitem"], [class*="CheckMarkOption"], [class*="LabelText"], [class*="MenuItem"], [class*="menu-item" i], [class*="dropdown-item" i], [class*="option"], li[data-value], li'
+        )
+      ) {
+        const t = LFLocator.textOf(node);
+        if (t && t.length < 80 && !skip.test(t) && !/results found/i.test(t)) return t;
+      }
+    }
+    return "";
+  }
 
   function root() {
     let el = document.getElementById(ROOT_ID);
@@ -59,23 +87,51 @@
     return null;
   }
 
+  function openTopLayer(el) {
+    if (!el) return;
+    if (!el.parentElement) root().appendChild(el);
+    if (typeof el.showPopover === "function") {
+      el.setAttribute("popover", "manual");
+      try {
+        el.showPopover();
+      } catch {
+        /* already open */
+      }
+    }
+  }
+
+  function closeTopLayer(el) {
+    if (!el) return;
+    if (typeof el.hidePopover === "function") {
+      try {
+        el.hidePopover();
+      } catch {
+        /* already closed */
+      }
+    }
+    el.remove();
+  }
+
   function closeDialog() {
     if (dialog) {
-      dialog.remove();
+      closeTopLayer(dialog);
       dialog = null;
     }
   }
 
   function showBanner() {
-    if (banner) return banner;
+    if (banner) {
+      openTopLayer(banner);
+      return banner;
+    }
     banner = document.createElement("div");
     banner.className = "lf-panel";
     banner.innerHTML = `
       <div class="lf-panel-head" data-lf="drag">
-        <strong>ListFill · capturing</strong>
+        <strong>List Pilot · capturing</strong>
         <span class="lf-panel-hint">Drag to move</span>
       </div>
-      <p class="lf-banner-count">Click fields on the form. Size first.</p>
+      <p class="lf-banner-count">Click fields on the form. For dropdowns, open the list and pick a value.</p>
       <div class="lf-panel-fields" data-lf="fields"></div>
       <div class="lf-panel-actions">
         <button type="button" class="lf-btn lf-btn-ghost" data-lf="stop">Stop capture</button>
@@ -83,6 +139,7 @@
       </div>
     `;
     root().appendChild(banner);
+    openTopLayer(banner);
     banner.querySelector("[data-lf='stop']").addEventListener("click", () => stopCapture());
     banner.querySelector("[data-lf='save-variant']").addEventListener("click", () => saveVariantFromPage());
     makeDraggable(banner, banner.querySelector("[data-lf='drag']"));
@@ -164,7 +221,7 @@
     await stopCapture();
     const note = document.createElement("div");
     note.className = "lf-toast ok";
-    note.innerHTML = `<strong>Variant saved</strong><div>${draft.name} · ${draft.fields.length} fields. Open ListFill to Autofill.</div>`;
+    note.innerHTML = `<strong>Variant saved</strong><div>${draft.name} · ${draft.fields.length} fields. Open List Pilot to Autofill.</div>`;
     root().appendChild(note);
     setTimeout(() => note.remove(), 5000);
   }
@@ -174,27 +231,78 @@
     return (draft && draft.fields && draft.fields.length) || 0;
   }
 
-  function showDialog(el) {
+  function hideOpenMenus() {
+    document.querySelectorAll("[popover]").forEach((p) => {
+      if (LFLocator.isOurUI(p)) return;
+      try {
+        if (typeof p.hidePopover === "function") p.hidePopover();
+      } catch {
+        /* ignore */
+      }
+    });
+  }
+
+  async function saveDropdownPick(el, picked) {
+    const locator = LFLocator.buildLocator(el);
+    const label = locator.label || LFLocator.textOf(el) || "Untitled field";
+    await persistField({
+      id: LF.uid(),
+      label,
+      kind: "select",
+      value: picked,
+      locator: { ...locator, label }
+    });
     closeDialog();
+    hideOpenMenus();
+    await updateBannerCount(await fieldCount());
+  }
+
+  function placeNear(anchor, overlay, width, height) {
+    const r = anchor.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let left = r.right + 12;
+    if (left + width > vw - 8) left = r.left - width - 12;
+    if (left < 8) left = Math.max(8, vw - width - 8);
+    const panel = banner && banner.getBoundingClientRect();
+    if (panel && left < panel.right + 8 && r.left > panel.right) {
+      left = Math.min(vw - width - 8, Math.max(panel.right + 8, 8));
+    }
+    let top = r.top;
+    if (top + height > vh - 8) top = Math.max(8, r.bottom - height);
+    if (top + height > vh - 8) top = Math.max(8, vh - height - 8);
+    if (top < 8) top = 8;
+    overlay.style.position = "fixed";
+    overlay.style.inset = "unset";
+    overlay.style.margin = "0";
+    overlay.style.top = `${Math.round(top)}px`;
+    overlay.style.left = `${Math.round(left)}px`;
+  }
+
+  function showDialog(el, presetValue) {
+    closeDialog();
+    hideOpenMenus();
     const locator = LFLocator.buildLocator(el);
     const label = locator.label || LFLocator.textOf(el) || "Untitled field";
     const kind = LFLocator.fieldKind(el, label);
-    const current = kind === "size" && !el.value ? LFLocator.textOf(el) : LFLocator.readValue(el);
+    let current = presetValue;
+    if (current == null || current === "") {
+      current = kind === "size" && !el.value ? LFLocator.textOf(el) : LFLocator.readValue(el);
+    }
+    if (/^(select|choose|pick|select one)$/i.test(String(current || "").trim())) current = "";
 
     dialog = document.createElement("div");
     dialog.className = "lf-dialog";
-    const r = el.getBoundingClientRect();
-    const dw = 300;
-    const dh = 260;
-    let left = window.scrollX + r.right + 12;
-    if (r.right + 12 + dw > window.innerWidth) left = window.scrollX + r.left - dw - 12;
-    if (left < window.scrollX + 8) left = window.scrollX + 8;
-    let top = window.scrollY + r.top;
-    if (r.top + dh > window.innerHeight) top = window.scrollY + Math.max(8, r.bottom - dh);
-    dialog.style.top = `${top}px`;
-    dialog.style.left = `${left}px`;
+    try {
+      el.scrollIntoView({ block: "center", inline: "nearest" });
+    } catch {
+      /* ignore */
+    }
+    const dw = 320;
+    const dh = 280;
+    placeNear(el, dialog, dw, dh);
 
-    const isArea = kind === "textarea";
+    const isArea = kind === "textarea" || (el.tagName === "TEXTAREA");
     dialog.innerHTML = `
       <div class="lf-dialog-h">Save this field</div>
       <label>Label</label>
@@ -204,14 +312,17 @@
       <div class="lf-kind">Detected: <b></b></div>
       <div class="lf-dialog-actions">
         <button type="button" class="lf-btn lf-btn-ghost" data-lf="cancel">Cancel</button>
-        <button type="button" class="lf-btn lf-btn-primary" data-lf="save">Save field</button>
+        <button type="button" class="lf-btn lf-btn-primary" data-lf="save" title="Enter">Save field</button>
       </div>
     `;
     dialog.querySelector('[data-lf="label"]').value = label;
     dialog.querySelector('[data-lf="value"]').value = current || "";
-    dialog.querySelector(".lf-kind b").textContent = kind;
+    dialog.querySelector(".lf-kind b").textContent =
+      kind === "select" ? "dropdown" : kind === "textarea" ? "long text" : kind;
 
     root().appendChild(dialog);
+    openTopLayer(dialog);
+    placeNear(el, dialog, dw, dh);
     const valueEl = dialog.querySelector('[data-lf="value"]');
     valueEl.focus();
     valueEl.select?.();
@@ -228,11 +339,6 @@
         locator: { ...locator, label: nextLabel }
       };
       await persistField(saved);
-      try {
-        await LFFill.fillOne(el, saved);
-      } catch {
-        if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") LFFill.setReactValue(el, nextValue);
-      }
       closeDialog();
       updateBannerCount(await fieldCount());
     });
@@ -241,12 +347,7 @@
   async function persistField(field) {
     const draft = (await LF.getDraft()) || LF.emptyVariant();
     const key = (field.label || "").trim().toLowerCase();
-    const locCss = field.locator?.strategies?.find((s) => s.type === "css")?.value;
-    draft.fields = (draft.fields || []).filter((f) => {
-      const sameLabel = (f.label || "").trim().toLowerCase() === key;
-      const sameCss = locCss && f.locator?.strategies?.find((s) => s.type === "css")?.value === locCss;
-      return !(sameLabel || sameCss);
-    });
+    draft.fields = (draft.fields || []).filter((f) => (f.label || "").trim().toLowerCase() !== key);
     draft.fields.push(field);
     draft.updatedAt = Date.now();
     await LF.saveDraft(draft);
@@ -260,11 +361,43 @@
     else hideRing();
   }
 
+  function onMouseDown(e) {
+    if (!active) return;
+    if (LFLocator.isOurUI(e.target)) return;
+    if (dialog) closeDialog();
+    const el = targetFromEvent(e) || hoverEl;
+    if (el && dropdownField(el)) pendingDropdown = el;
+  }
+
   function onClick(e) {
     if (!active) return;
     if (LFLocator.isOurUI(e.target)) return;
+
+    if (pendingDropdown) {
+      const path = e.composedPath ? e.composedPath() : [];
+      const onSame =
+        path.includes(pendingDropdown) ||
+        (e.target instanceof Element && pendingDropdown.contains(e.target));
+      if (onSame) return;
+      const picked = optionTextFromEvent(e);
+      if (picked) {
+        const fieldEl = pendingDropdown;
+        pendingDropdown = null;
+        setTimeout(() => {
+          saveDropdownPick(fieldEl, picked).catch(() => {});
+        }, 80);
+      }
+      return;
+    }
+
     const el = targetFromEvent(e) || hoverEl;
     if (!el) return;
+
+    if (dropdownField(el)) {
+      pendingDropdown = el;
+      return;
+    }
+
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
@@ -273,6 +406,13 @@
 
   function onKey(e) {
     if (!active) return;
+    if (e.key === "Enter" && dialog) {
+      if (e.target instanceof HTMLTextAreaElement && !e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      dialog.querySelector('[data-lf="save"]')?.click();
+      return;
+    }
     if (e.key === "Escape") {
       if (dialog) {
         closeDialog();
@@ -289,6 +429,7 @@
     showBanner();
     updateBannerCount(await fieldCount());
     document.addEventListener("mousemove", onMove, true);
+    document.addEventListener("mousedown", onMouseDown, true);
     document.addEventListener("click", onClick, true);
     document.addEventListener("keydown", onKey, true);
     await LF.set(LF.STORAGE.CAPTURE, { active: true, startedAt: Date.now() });
@@ -298,13 +439,15 @@
   async function stopCapture() {
     active = false;
     hoverEl = null;
+    pendingDropdown = null;
     hideRing();
     closeDialog();
     if (banner) {
-      banner.remove();
+      closeTopLayer(banner);
       banner = null;
     }
     document.removeEventListener("mousemove", onMove, true);
+    document.removeEventListener("mousedown", onMouseDown, true);
     document.removeEventListener("click", onClick, true);
     document.removeEventListener("keydown", onKey, true);
     await LF.set(LF.STORAGE.CAPTURE, { active: false });

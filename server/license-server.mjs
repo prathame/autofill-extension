@@ -9,8 +9,11 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const cfgSrc = existsSync(join(root, "license-config.js"))
   ? readFileSync(join(root, "license-config.js"), "utf8")
   : "";
+const secretFile = join(root, "server", "signing.secret");
 const signingSecret =
-  process.env.SIGNING_SECRET || cfgSrc.match(/signingSecret:\s*"([^"]+)"/)?.[1] || "";
+  process.env.SIGNING_SECRET ||
+  (existsSync(secretFile) ? readFileSync(secretFile, "utf8").trim() : "") ||
+  "";
 const maxDevices = Number(process.env.MAX_DEVICES || cfgSrc.match(/maxDevices:\s*(\d+)/)?.[1] || 1) || 1;
 const DAYS = { monthly: 31, yearly: 366, lifetime: 3650 };
 
@@ -304,7 +307,7 @@ const server = createServer(async (req, res) => {
 });
 
 if (!signingSecret || signingSecret.includes("change-this")) {
-  console.error("Set SIGNING_SECRET (same value as license-config.js).");
+  console.error("Set SIGNING_SECRET (or server/signing.secret) before starting.");
   process.exit(1);
 }
 
@@ -317,7 +320,7 @@ await initStore();
 
 const port = Number(process.env.PORT || 8788);
 server.listen(port, "0.0.0.0", () => {
-  console.log(`ListFill license server on port ${port}`);
+  console.log(`List Pilot license server on port ${port}`);
   console.log(`Admin: http://0.0.0.0:${port}/admin/`);
   console.log(`Admin token: ${adminToken}`);
   console.log(`Store: ${pool ? "postgres" : "file"}`);

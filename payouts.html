@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>List Pilot · Meesho P&amp;L</title>
+    <link rel="stylesheet" href="popup.css" />
+    <link rel="stylesheet" href="photos.css" />
+    <link rel="stylesheet" href="payouts.css" />
+  </head>
+  <body class="photos-page">
+    <div class="app">
+      <header class="hdr">
+        <div class="hdr-row">
+          <div class="brand">
+            <div class="brand-mark">
+              <img src="icons/icon48.png" alt="" width="28" height="28" />
+            </div>
+            <div>
+              <div class="brand-name">
+                List Pilot
+                <span id="plan-badge" class="pro">TRIAL</span>
+              </div>
+              <p class="brand-sub">Meesho monthly P&amp;L · files stay on this computer</p>
+            </div>
+          </div>
+        </div>
+      </header>
+      <div class="body">
+        <div id="payout-kit"></div>
+      </div>
+    </div>
+    <div id="paywall" class="paywall hidden">
+      <div class="paywall-card">
+        <h2>Continue with List Pilot Pro</h2>
+        <p class="hint-center">Install is free. After the 5-day trial, Autofill, photo downloads, and payout CSV export need a subscription.</p>
+        <p id="pay-price" class="price">₹199 / month</p>
+        <p id="pay-year" class="muted tiny">₹1,499 / year</p>
+        <p class="hint-center">Contact admin for a license key</p>
+        <div class="contact-admin">
+          <a id="contact-email" href="mailto:prathameshbusa@gmail.com">prathameshbusa@gmail.com</a>
+          <a id="contact-phone" href="tel:+918806907616">8806907616</a>
+        </div>
+        <input id="license-key" class="input" type="text" placeholder="LF1.monthly.……" />
+        <div class="row-end">
+          <button id="paywall-close" class="btn-ghost sm-btn" type="button">Not now</button>
+          <button id="btn-activate" class="btn-save sm-btn" type="button">Activate</button>
+        </div>
+      </div>
+    </div>
+    <script src="shared.js"></script>
+    <script src="license-config.js"></script>
+    <script src="src/license.js"></script>
+    <script src="src/pnl.js"></script>
+    <script src="src/payouts.js"></script>
+    <script src="payouts-page.js"></script>
+  </body>
+</html>

@@ -15,15 +15,55 @@ const KIND_LABEL = {
   radio: "Toggle"
 };
 
+let addons = { photos: false, payouts: false };
+let photosMounted = false;
+let payoutsMounted = false;
+
 function show(id) {
+  if (id === "photos" && !addons.photos) id = "account";
+  if (id === "payouts" && !addons.payouts) id = "account";
   $("view-home").classList.toggle("hidden", id !== "home");
   $("view-editor").classList.toggle("hidden", id !== "editor");
+  $("view-photos").classList.toggle("hidden", id !== "photos");
+  $("view-payouts").classList.toggle("hidden", id !== "payouts");
   $("view-account").classList.toggle("hidden", id !== "account");
   $("tab-home").classList.toggle("tab-on", id === "home");
   $("tab-editor").classList.toggle("tab-on", id === "editor");
+  $("tab-photos").classList.toggle("tab-on", id === "photos");
+  $("tab-payouts").classList.toggle("tab-on", id === "payouts");
   $("tab-account").classList.toggle("tab-on", id === "account");
   $("btn-fill-current").classList.toggle("hidden", id !== "editor");
   $("btn-save").classList.toggle("hidden", id !== "editor");
+  $("btn-fill-current").parentElement?.classList.toggle("hidden", id !== "editor");
+}
+
+function applyAddonTabs() {
+  $("tab-photos").classList.toggle("hidden", !addons.photos);
+  $("tab-payouts").classList.toggle("hidden", !addons.payouts);
+  const n = 3 + (addons.photos ? 1 : 0) + (addons.payouts ? 1 : 0);
+  $("tab-home").parentElement.classList.remove("tabs-3", "tabs-4", "tabs-5");
+  $("tab-home").parentElement.classList.add(`tabs-${n}`);
+  if (addons.photos) ensurePhotos();
+  if (addons.payouts) ensurePayouts();
+}
+
+function ensurePhotos() {
+  if (photosMounted || typeof LFPhotos === "undefined") return;
+  LFPhotos.mount($("view-photos"), { compact: true });
+  photosMounted = true;
+}
+
+function ensurePayouts() {
+  if (payoutsMounted || typeof LFPayouts === "undefined") return;
+  LFPayouts.mount($("view-payouts"), { compact: true });
+  payoutsMounted = true;
+}
+
+async function loadAddons() {
+  addons = await LF.getAddons();
+  $("addon-photos").checked = !!addons.photos;
+  $("addon-payouts").checked = !!addons.payouts;
+  applyAddonTabs();
 }
 
 function planTitle(plan) {
@@ -48,7 +88,7 @@ function initialsFrom(name) {
     .trim()
     .split(/\s+/)
     .filter(Boolean);
-  if (!parts.length) return "LF";
+  if (!parts.length) return "LP";
   return parts
     .slice(0, 2)
     .map((p) => p[0].toUpperCase())
@@ -109,7 +149,7 @@ function bindContactLinks() {
   const mail = $("contact-email");
   const tel = $("contact-phone");
   if (mail) {
-    mail.href = `mailto:${email}?subject=${encodeURIComponent("ListFill Pro license")}`;
+    mail.href = `mailto:${email}?subject=${encodeURIComponent("List Pilot Pro license")}`;
     mail.textContent = email;
   }
   if (tel) {
@@ -154,7 +194,7 @@ async function requireAccess() {
   if (access.ok) return true;
   const wall = $("paywall");
   if (wall) wall.classList.remove("hidden");
-  status("Trial ended. Activate a license to Autofill.", true);
+  status("Trial ended. Activate a license to Autofill, download photos, or export the P&L CSV.", true);
   return false;
 }
 window.requireAccess = requireAccess;
@@ -195,14 +235,22 @@ async function sendToTab(message) {
     throw new Error("Open a Meesho or Flipkart listing page first");
   }
   try {
+    await chrome.scripting.executeScript({
+      target: { tabId: listingTab.id, allFrames: true },
+      files: ["src/locator.js"]
+    });
+  } catch {
+    /* page may not allow scripting until granted */
+  }
+  try {
     return await chrome.tabs.sendMessage(listingTab.id, message);
   } catch {
     await chrome.scripting.executeScript({
-      target: { tabId: listingTab.id },
+      target: { tabId: listingTab.id, allFrames: true },
       files: ["shared.js", "src/locator.js", "src/fill.js", "src/capture.js", "src/content.js"]
     });
     await chrome.scripting.insertCSS({
-      target: { tabId: listingTab.id },
+      target: { tabId: listingTab.id, allFrames: true },
       files: ["src/content.css"]
     });
     return await chrome.tabs.sendMessage(listingTab.id, message);
@@ -453,7 +501,8 @@ async function saveVariant() {
   else variants.push(LF.clone(draft));
   await LF.saveVariants(variants);
   await renderHome();
-  status("Variant saved. Edited values will be used on Autofill.");
+  await downloadBackup();
+  status("Variant saved. A backup JSON was downloaded.");
 }
 
 async function togglePin(id) {
@@ -496,7 +545,7 @@ async function fillVariant(id) {
     await renderHome();
     await LFLicense.recordFill();
     const missed = res.results?.failed?.length || 0;
-    status(`Filled ${res.results.filled} fields${missed ? `, ${missed} missed` : ""}.`);
+  status(`Filled ${res.results.filled} fields${missed ? `, ${missed} missed` : ""}. Review, then submit the listing yourself.`);
   } catch (err) {
     status(err.message || String(err), true);
   }
@@ -586,6 +635,14 @@ $("tab-editor").addEventListener("click", async () => {
   if (!draft) await openEditor();
   else show("editor");
 });
+$("tab-photos").addEventListener("click", async () => {
+  await persistDraft();
+  show("photos");
+});
+$("tab-payouts").addEventListener("click", async () => {
+  await persistDraft();
+  show("payouts");
+});
 $("tab-account").addEventListener("click", async () => {
   await persistDraft();
   show("account");
@@ -596,6 +653,20 @@ $("plan-badge").addEventListener("click", async () => {
   show("account");
   await refreshPlanUI();
 });
+$("addon-photos").addEventListener("change", async () => {
+  addons.photos = $("addon-photos").checked;
+  await LF.saveAddons(addons);
+  applyAddonTabs();
+  if (!addons.photos && $("tab-photos").classList.contains("tab-on")) show("account");
+  status(addons.photos ? "Photos tab is on." : "Photos tab hidden.");
+});
+$("addon-payouts").addEventListener("change", async () => {
+  addons.payouts = $("addon-payouts").checked;
+  await LF.saveAddons(addons);
+  applyAddonTabs();
+  if (!addons.payouts && $("tab-payouts").classList.contains("tab-on")) show("account");
+  status(addons.payouts ? "P&L tab is on." : "P&L tab hidden.");
+});
 $("btn-profile-upgrade").addEventListener("click", () => $("paywall").classList.remove("hidden"));
 $("btn-profile-key").addEventListener("click", () => $("paywall").classList.remove("hidden"));
 $("btn-new").addEventListener("click", async () => {
@@ -604,6 +675,28 @@ $("btn-new").addEventListener("click", async () => {
   await openEditor();
 });
 $("btn-save").addEventListener("click", saveVariant);
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  if (e.target instanceof HTMLTextAreaElement && !e.ctrlKey && !e.metaKey) return;
+  const wall = $("paywall");
+  if (wall && !wall.classList.contains("hidden")) {
+    e.preventDefault();
+    $("btn-activate")?.click();
+    return;
+  }
+  const manual = $("manual-box");
+  if (manual && !manual.classList.contains("hidden")) {
+    e.preventDefault();
+    $("manual-save")?.click();
+    return;
+  }
+  if ($("view-photos") && !$("view-photos").classList.contains("hidden")) return;
+  if ($("view-payouts") && !$("view-payouts").classList.contains("hidden")) return;
+  if ($("view-editor") && !$("view-editor").classList.contains("hidden")) {
+    e.preventDefault();
+    saveVariant();
+  }
+});
 $("btn-fill-current").addEventListener("click", fillCurrent);
 $("btn-capture").addEventListener("click", startCapture);
 $("btn-stop-capture").addEventListener("click", stopCapture);
@@ -662,7 +755,7 @@ $("manual-save").addEventListener("click", async () => {
   renderFields();
 });
 
-$("btn-export").addEventListener("click", async () => {
+async function downloadBackup() {
   const variants = await LF.getVariants();
   const blob = new Blob([JSON.stringify({ variants, exportedAt: new Date().toISOString() }, null, 2)], {
     type: "application/json"
@@ -670,9 +763,14 @@ $("btn-export").addEventListener("click", async () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "listfill-variants.json";
+    a.download = "listpilot-variants.json";
   a.click();
   URL.revokeObjectURL(url);
+}
+
+$("btn-export").addEventListener("click", async () => {
+  await downloadBackup();
+  status("Backup downloaded.");
 });
 $("btn-import").addEventListener("click", () => $("import-file").click());
 $("import-file").addEventListener("change", async (e) => {
@@ -711,6 +809,7 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
 
 (async function init() {
   await loadTheme();
+  await loadAddons();
   await refreshPagePill();
   await refreshPlanUI();
   await renderHome();
