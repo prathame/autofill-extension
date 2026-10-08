@@ -267,7 +267,7 @@ html.light .icon-sun {
 
 .tabs {
   display: grid;
-  grid-template-columns: 1.1fr 1fr 0.9fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 2px;
   margin-top: 10px;
   padding: 3px;
@@ -276,13 +276,25 @@ html.light .icon-sun {
   border-radius: 8px;
 }
 
+.tabs.tabs-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tabs.tabs-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.tabs.tabs-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .tab {
   border: 0;
   background: transparent;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  padding: 6px 8px;
+  padding: 6px 4px;
   border-radius: 6px;
   cursor: pointer;
 }
@@ -777,4 +789,185 @@ html.light .status.bad {
 ::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 99px;
+}
+
+.photo-seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+  margin: 8px 0 6px;
+}
+
+.photo-seg-item {
+  display: block;
+  cursor: pointer;
+}
+
+.photo-seg-item input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.photo-seg-item span {
+  display: block;
+  text-align: center;
+  padding: 7px 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--input);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.photo-seg-item input:checked + span {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.photo-white {
+  margin: 8px 0 0;
+}
+
+.photo-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 88px;
+  padding: 14px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: var(--subtle);
+  cursor: pointer;
+  text-align: center;
+}
+
+.photo-drop-on {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.photo-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.photo-card {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 10px;
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.photo-card img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.photo-card strong {
+  display: block;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.photo-card .sm-btn {
+  margin-top: 6px;
+}
+
+.photo-card-err {
+  grid-template-columns: 1fr;
+}
+
+.photo-warn {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--danger);
+}
+
+.photo-bad {
+  color: var(--danger);
+}
+
+.addon-toggle {
+  margin-top: 8px;
+}
+
+.addon-hint {
+  margin: 2px 0 8px 24px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.pay-kpis {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pay-kpis div {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.pay-kpis span {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pay-kpis strong {
+  font-size: 16px;
+}
+
+.pay-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pay-row {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 1fr;
+  gap: 6px;
+  font-size: 11px;
+  align-items: center;
+}
+
+#pay-download {
+  margin-bottom: 8px;
+}
+
+.pnl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.pnl-table th,
+.pnl-table td {
+  text-align: left;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.pnl-table .input.sm {
+  width: 76px;
 }

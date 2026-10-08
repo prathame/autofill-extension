@@ -1,4 +1,4 @@
-List Pilot v1.5.0 — install on Chrome (Windows, Mac, Linux)
+List Pilot v1.8.0 — install on Chrome (Windows, Mac, Linux)
 
 1. Unzip this folder.
 2. Open Chrome and go to: chrome://extensions
@@ -13,6 +13,10 @@ Capture: click "Pick fields on live page", then click each form field.
 Flipkart dropdowns: open the list and click the value — it saves into the capturing panel.
 Then Save variant. Autofill on the next listing. You still submit the catalog yourself.
 List Pilot never clicks Send to QC / Submit.
+
+Add-ons (Account tab, off until you enable them):
+- Listing photo kit → Photos tab. Drop shots → Meesho 1080 / Flipkart 1500 / Both. Compress, strip EXIF, optional white square.
+- Meesho P&L → P&L tab. Upload month orders CSV, that month’s Payments to Date zip (do not unzip), then next month’s zip. Enter SKU product + pack cost. Files stay in the browser.
 
 Trial is 5 days and works even if the license server is asleep.
 Pro keys need https://autofill-extension.onrender.com — wait ~30s if the first activate fails, then try again.

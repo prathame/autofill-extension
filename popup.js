@@ -15,15 +15,55 @@ const KIND_LABEL = {
   radio: "Toggle"
 };
 
+let addons = { photos: false, payouts: false };
+let photosMounted = false;
+let payoutsMounted = false;
+
 function show(id) {
+  if (id === "photos" && !addons.photos) id = "account";
+  if (id === "payouts" && !addons.payouts) id = "account";
   $("view-home").classList.toggle("hidden", id !== "home");
   $("view-editor").classList.toggle("hidden", id !== "editor");
+  $("view-photos").classList.toggle("hidden", id !== "photos");
+  $("view-payouts").classList.toggle("hidden", id !== "payouts");
   $("view-account").classList.toggle("hidden", id !== "account");
   $("tab-home").classList.toggle("tab-on", id === "home");
   $("tab-editor").classList.toggle("tab-on", id === "editor");
+  $("tab-photos").classList.toggle("tab-on", id === "photos");
+  $("tab-payouts").classList.toggle("tab-on", id === "payouts");
   $("tab-account").classList.toggle("tab-on", id === "account");
   $("btn-fill-current").classList.toggle("hidden", id !== "editor");
   $("btn-save").classList.toggle("hidden", id !== "editor");
+  $("btn-fill-current").parentElement?.classList.toggle("hidden", id !== "editor");
+}
+
+function applyAddonTabs() {
+  $("tab-photos").classList.toggle("hidden", !addons.photos);
+  $("tab-payouts").classList.toggle("hidden", !addons.payouts);
+  const n = 3 + (addons.photos ? 1 : 0) + (addons.payouts ? 1 : 0);
+  $("tab-home").parentElement.classList.remove("tabs-3", "tabs-4", "tabs-5");
+  $("tab-home").parentElement.classList.add(`tabs-${n}`);
+  if (addons.photos) ensurePhotos();
+  if (addons.payouts) ensurePayouts();
+}
+
+function ensurePhotos() {
+  if (photosMounted || typeof LFPhotos === "undefined") return;
+  LFPhotos.mount($("view-photos"), { compact: true });
+  photosMounted = true;
+}
+
+function ensurePayouts() {
+  if (payoutsMounted || typeof LFPayouts === "undefined") return;
+  LFPayouts.mount($("view-payouts"), { compact: true });
+  payoutsMounted = true;
+}
+
+async function loadAddons() {
+  addons = await LF.getAddons();
+  $("addon-photos").checked = !!addons.photos;
+  $("addon-payouts").checked = !!addons.payouts;
+  applyAddonTabs();
 }
 
 function planTitle(plan) {
@@ -154,7 +194,7 @@ async function requireAccess() {
   if (access.ok) return true;
   const wall = $("paywall");
   if (wall) wall.classList.remove("hidden");
-  status("Trial ended. Activate a license to Autofill.", true);
+  status("Trial ended. Activate a license to Autofill, download photos, or export the P&L CSV.", true);
   return false;
 }
 window.requireAccess = requireAccess;
@@ -595,6 +635,14 @@ $("tab-editor").addEventListener("click", async () => {
   if (!draft) await openEditor();
   else show("editor");
 });
+$("tab-photos").addEventListener("click", async () => {
+  await persistDraft();
+  show("photos");
+});
+$("tab-payouts").addEventListener("click", async () => {
+  await persistDraft();
+  show("payouts");
+});
 $("tab-account").addEventListener("click", async () => {
   await persistDraft();
   show("account");
@@ -604,6 +652,20 @@ $("plan-badge").addEventListener("click", async () => {
   await persistDraft();
   show("account");
   await refreshPlanUI();
+});
+$("addon-photos").addEventListener("change", async () => {
+  addons.photos = $("addon-photos").checked;
+  await LF.saveAddons(addons);
+  applyAddonTabs();
+  if (!addons.photos && $("tab-photos").classList.contains("tab-on")) show("account");
+  status(addons.photos ? "Photos tab is on." : "Photos tab hidden.");
+});
+$("addon-payouts").addEventListener("change", async () => {
+  addons.payouts = $("addon-payouts").checked;
+  await LF.saveAddons(addons);
+  applyAddonTabs();
+  if (!addons.payouts && $("tab-payouts").classList.contains("tab-on")) show("account");
+  status(addons.payouts ? "P&L tab is on." : "P&L tab hidden.");
 });
 $("btn-profile-upgrade").addEventListener("click", () => $("paywall").classList.remove("hidden"));
 $("btn-profile-key").addEventListener("click", () => $("paywall").classList.remove("hidden"));
@@ -628,6 +690,8 @@ document.addEventListener("keydown", (e) => {
     $("manual-save")?.click();
     return;
   }
+  if ($("view-photos") && !$("view-photos").classList.contains("hidden")) return;
+  if ($("view-payouts") && !$("view-payouts").classList.contains("hidden")) return;
   if ($("view-editor") && !$("view-editor").classList.contains("hidden")) {
     e.preventDefault();
     saveVariant();
@@ -745,6 +809,7 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
 
 (async function init() {
   await loadTheme();
+  await loadAddons();
   await refreshPagePill();
   await refreshPlanUI();
   await renderHome();

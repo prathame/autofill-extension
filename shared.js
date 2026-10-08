@@ -6,6 +6,25 @@ const LF = {
     SETTINGS: "lf_settings"
   },
 
+  defaultAddons() {
+    return { photos: false, payouts: false };
+  },
+
+  async getAddons() {
+    const s = (await LF.get(LF.STORAGE.SETTINGS, {})) || {};
+    return {
+      photos: s.photos === true,
+      payouts: s.payouts === true
+    };
+  },
+
+  async saveAddons(addons) {
+    const s = (await LF.get(LF.STORAGE.SETTINGS, {})) || {};
+    s.photos = !!addons.photos;
+    s.payouts = !!addons.payouts;
+    await LF.set(LF.STORAGE.SETTINGS, s);
+  },
+
   emptyVariant() {
     return {
       id: LF.uid(),

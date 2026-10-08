@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "List Pilot for Meesho & Flipkart",
-  "version": "1.5.0",
-  "description": "Save reusable product variants and autofill Meesho and Flipkart seller listing forms in one click. Independent unofficial tool.",
+  "version": "1.8.0",
+  "description": "Autofill Meesho and Flipkart listing forms. Optional photo kit and Meesho monthly P&L from order and payment files. Independent unofficial tool.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

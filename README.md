@@ -1,6 +1,6 @@
 # List Pilot for Meesho & Flipkart
 
-Independent Chrome extension that saves reusable product variants and autofills **Meesho** and **Flipkart Seller Hub** listing forms. You still review and submit the catalog yourself.
+Independent Chrome extension that saves reusable product variants and autofills **Meesho** and **Flipkart Seller Hub** listing forms. Optional add-ons (Account → toggles): listing-ready photos, and a Meesho monthly P&L report. You still review and submit the catalog yourself.
 
 This is not affiliated with Meesho or Flipkart.
 
@@ -15,14 +15,34 @@ On **Meesho**, open the supplier Add Product page. On **Flipkart**, open Seller 
 
 Practice page: `python3 -m http.server 8787` then open http://127.0.0.1:8787/demo/
 
+## Add-ons
+
+Both are **off until you enable them** in the popup **Account** tab. That keeps the default UI as Variants / Preset / Account.
+
+### Photo kit
+
+Turn on **Listing photo kit**. Popup → **Photos** (or `photos.html`). Pick Meesho (1080×1080), Flipkart (1500×1500), or Both. Drop JPG/PNG/WebP. List Pilot redraws on a canvas so EXIF is stripped, compresses JPEG under the size cap, and can pad onto a white square. It does **not** cut a busy background off the product.
+
+### Meesho P&L report
+
+Turn on **Meesho P&L report**. Popup → **P&L** (or `payouts.html`). Upload three files, all processed in the browser:
+
+1. Meesho **Orders** CSV for the month
+2. **Payments → Download → Payments to Date** zip for that same month (do not unzip)
+3. The **next month’s** Payments to Date zip (at least ~15 days), so delayed settlements are not treated as unpaid
+
+Then enter **product + packaging cost per SKU**. Profit is settlement + recovery + referral − ads − product − pack − misc, then output GST and ITC. Listed price and GMV are not profit. Cancelled rows are excluded from net orders. Exchange rows count pack cost twice.
+
+Trial can build the report; after trial, CSV export needs Pro. This is not GST filing and it does not log into the seller panel.
+
 ## Free install + paid subscription
 
-The Chrome Web Store listing is **free to install**. Autofill is free for **5 days**, then needs Pro.
+The Chrome Web Store listing is **free to install**. Autofill, photo downloads, and P&L CSV export are free for **5 days**, then need Pro.
 
 | Free trial | Pro |
 |---|---|
-| Capture fields, save variants | Everything in trial |
-| 5 days of Autofill | Unlimited Autofill until the key expires |
+| Capture fields, save variants, photo kit, Meesho P&L | Everything in trial |
+| 5 days of Autofill, photo downloads, and P&L export | Unlimited until the key expires |
 | Data stays in the browser | Same, plus a license key |
 
 Chrome does **not** bill subscriptions for you anymore. You take payment outside the store (Razorpay is the usual choice in India), then send the seller a license key.
