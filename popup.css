@@ -798,6 +798,10 @@ html.light .status.bad {
   margin: 8px 0 6px;
 }
 
+.photo-seg-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
 .photo-seg-item {
   display: block;
   cursor: pointer;
@@ -855,6 +859,19 @@ html.light .status.bad {
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
+}
+
+.photo-list-ship {
+  grid-template-columns: 1fr 1fr;
+}
+
+.photo-list-ship .photo-card {
+  grid-template-columns: 56px 1fr;
+}
+
+.photo-list-ship .photo-card img {
+  width: 56px;
+  height: 56px;
 }
 
 .photo-card {

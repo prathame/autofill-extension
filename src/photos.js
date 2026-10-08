@@ -5,6 +5,43 @@
     both: { id: "both", size: 1500, maxBytes: 1572864, quality: 0.86, tag: "listing", label: "Both", hint: "1500×1500 JPEG · fits Meesho and Flipkart" }
   };
 
+  const SHIP_NOTE = `List Pilot shipping-image variants
+1080×1080 JPEGs for the Meesho listing photo. Upload each on Add Product and compare the shipping quote Meesho shows. Use the lowest quote that still looks like your product.
+
+List Pilot does not log into Meesho and does not read the rupee amount. Filenames: {photo}-ship-{layout}.jpg
+p50 = product uses about 50% of the square (more white). p90 fills more of the frame. line/grey/wide are canvas borders, not product tags.
+`;
+
+  function shippingLayouts() {
+    const out = [];
+    const pads = [0.5, 0.58, 0.66, 0.74, 0.82, 0.9];
+    const borders = [
+      { id: "plain", w: 0, color: "#ffffff" },
+      { id: "line", w: 3, color: "#ececec" },
+      { id: "grey", w: 10, color: "#d0d0d0" },
+      { id: "wide", w: 28, color: "#f2f2f2" }
+    ];
+    for (const pad of pads) {
+      for (const b of borders) {
+        if (pad <= 0.52 && b.id === "wide") continue;
+        out.push({
+          id: `p${Math.round(pad * 100)}-${b.id}`,
+          label: `${Math.round(pad * 100)}% ${b.id}`,
+          pad,
+          border: b.w,
+          borderColor: b.color
+        });
+      }
+    }
+    out.push({ id: "fill", label: "fill square", cover: true, zoom: 1 });
+    out.push({ id: "zoom", label: "slight zoom", cover: true, zoom: 1.12 });
+    out.push({ id: "p70-up", label: "70% up", pad: 0.7, offsetY: -0.04 });
+    out.push({ id: "p70-down", label: "70% down", pad: 0.7, offsetY: 0.04 });
+    out.push({ id: "p74-bright", label: "74% bright", pad: 0.74, filter: "brightness(1.08) contrast(1.04)" });
+    out.push({ id: "p66-soft", label: "66% soft", pad: 0.66, filter: "brightness(1.04) saturate(0.92)" });
+    return out;
+  }
+
   const CRC_TABLE = (() => {
     const t = new Uint32Array(256);
     for (let i = 0; i < 256; i++) {
@@ -170,6 +207,71 @@
     return out;
   }
 
+  function paintSquare(ctx, bitmap, size, layout) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.fillStyle = layout.canvas || "#ffffff";
+    ctx.fillRect(0, 0, size, size);
+    const srcW = bitmap.width;
+    const srcH = bitmap.height;
+    const offsetY = size * (layout.offsetY || 0);
+    if (layout.filter) ctx.filter = layout.filter;
+    let dw;
+    let dh;
+    let dx;
+    let dy;
+    if (layout.cover) {
+      const zoom = layout.zoom || 1;
+      const scale = Math.max(size / srcW, size / srcH) * zoom;
+      dw = srcW * scale;
+      dh = srcH * scale;
+      dx = (size - dw) / 2;
+      dy = (size - dh) / 2 + offsetY;
+    } else {
+      const border = Number(layout.border) || 0;
+      const inner = Math.max(8, size - border * 2);
+      const pad = layout.pad == null ? 0.86 : layout.pad;
+      const frame = inner * pad;
+      const scale = Math.min(frame / srcW, frame / srcH);
+      dw = srcW * scale;
+      dh = srcH * scale;
+      dx = (size - dw) / 2;
+      dy = (size - dh) / 2 + offsetY;
+    }
+    ctx.drawImage(bitmap, dx, dy, dw, dh);
+    ctx.filter = "none";
+    if (!layout.cover && layout.border > 0) {
+      ctx.strokeStyle = layout.borderColor || "#e5e5e5";
+      ctx.lineWidth = layout.border;
+      ctx.strokeRect(layout.border / 2, layout.border / 2, size - layout.border, size - layout.border);
+    }
+    ctx.restore();
+  }
+
+  function sourceWarn(srcW, srcH, size, blob, maxBytes) {
+    const warn = [];
+    if (Math.min(srcW, srcH) < 500) warn.push("Source is under 500px — it may look soft on zoom.");
+    else if (Math.min(srcW, srcH) < size * 0.7) warn.push("Source is smaller than the target size — edges may look soft.");
+    if (blob.size > maxBytes) warn.push("Still over the size cap after compress. Try a simpler photo.");
+    return warn;
+  }
+
+  async function encodeCanvas(canvas, preset, stem, tag, extra) {
+    const blob = await encodeJpeg(canvas, preset.maxBytes, preset.quality);
+    return {
+      blob,
+      width: canvas.width,
+      height: canvas.height,
+      bytes: blob.size,
+      name: `${stem}-${tag}.jpg`,
+      warn: extra.warn || [],
+      originalName: extra.originalName,
+      label: extra.label || "",
+      layoutId: extra.layoutId || ""
+    };
+  }
+
   async function processFile(file, options) {
     const preset = PRESETS[options.preset] || PRESETS.both;
     const white = options.white !== false;
@@ -183,38 +285,10 @@
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext("2d", { alpha: false });
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, size, size);
-
-    let dw;
-    let dh;
-    let dx;
-    let dy;
-    if (white) {
-      const inner = size * 0.86;
-      const scale = Math.min(inner / srcW, inner / srcH);
-      dw = srcW * scale;
-      dh = srcH * scale;
-      dx = (size - dw) / 2;
-      dy = (size - dh) / 2;
-    } else {
-      const scale = Math.max(size / srcW, size / srcH);
-      dw = srcW * scale;
-      dh = srcH * scale;
-      dx = (size - dw) / 2;
-      dy = (size - dh) / 2;
-    }
-    ctx.drawImage(bitmap, dx, dy, dw, dh);
+    paintSquare(ctx, bitmap, size, white ? { pad: 0.86 } : { cover: true, zoom: 1 });
     if (typeof bitmap.close === "function") bitmap.close();
 
     const blob = await encodeJpeg(canvas, preset.maxBytes, preset.quality);
-    const warn = [];
-    if (Math.min(srcW, srcH) < 500) warn.push("Source is under 500px — it may look soft on zoom.");
-    else if (Math.min(srcW, srcH) < size * 0.7) warn.push("Source is smaller than the target size — edges may look soft.");
-    if (blob.size > preset.maxBytes) warn.push("Still over the size cap after compress. Try a simpler photo.");
-
     return {
       blob,
       width: size,
@@ -223,9 +297,36 @@
       srcH,
       bytes: blob.size,
       name: `${stemOf(file.name)}-${preset.tag}.jpg`,
-      warn,
+      warn: sourceWarn(srcW, srcH, size, blob, preset.maxBytes),
       originalName: file.name
     };
+  }
+
+  async function processShippingFile(file, used) {
+    const preset = PRESETS.meesho;
+    const bitmap = await loadBitmap(file);
+    const srcW = bitmap.width;
+    const srcH = bitmap.height;
+    if (!srcW || !srcH) throw new Error("This image has no size.");
+    const stem = stemOf(file.name);
+    const canvas = document.createElement("canvas");
+    canvas.width = preset.size;
+    canvas.height = preset.size;
+    const ctx = canvas.getContext("2d", { alpha: false });
+    const items = [];
+    for (const layout of shippingLayouts()) {
+      paintSquare(ctx, bitmap, preset.size, layout);
+      const item = await encodeCanvas(canvas, preset, stem, `ship-${layout.id}`, {
+        originalName: file.name,
+        label: layout.label,
+        layoutId: layout.id
+      });
+      item.warn = sourceWarn(srcW, srcH, preset.size, item.blob, preset.maxBytes);
+      item.name = uniqueName(item.name, used);
+      items.push(item);
+    }
+    if (typeof bitmap.close === "function") bitmap.close();
+    return items;
   }
 
   function fmtBytes(n) {
@@ -278,11 +379,15 @@
     if (!item.previewUrl) item.previewUrl = URL.createObjectURL(item.blob);
     const url = item.previewUrl;
     const warn = item.warn.length ? `<p class="photo-warn">${esc(item.warn[0])}</p>` : "";
+    const title = item.label ? item.label : item.name;
+    const meta = item.label
+      ? `${esc(item.name)} · ${fmtBytes(item.bytes)}`
+      : `${item.width}×${item.height} · ${fmtBytes(item.bytes)} · EXIF stripped`;
     return `<article class="photo-card" data-i="${i}">
       <img alt="" src="${url}" />
       <div>
-        <strong>${esc(item.name)}</strong>
-        <p class="muted tiny">${item.width}×${item.height} · ${fmtBytes(item.bytes)} · EXIF stripped</p>
+        <strong>${esc(title)}</strong>
+        <p class="muted tiny">${meta}</p>
         ${warn}
         <button class="btn-ghost sm-btn photo-one" type="button" data-i="${i}">Download</button>
       </div>
@@ -294,27 +399,40 @@
     root.innerHTML = `
       <section class="card">
         <p class="section-label">Listing photo kit</p>
-        <p class="sku-hint">Resize to a square, compress, strip EXIF. Optional white canvas pads the photo — it does not cut out an existing background.</p>
-        <div class="photo-seg" role="radiogroup" aria-label="Marketplace size">
-          ${Object.values(PRESETS)
-            .map(
-              (p, i) => `<label class="photo-seg-item">
-            <input type="radio" name="photo-preset" value="${p.id}" ${i === 2 ? "checked" : ""} />
-            <span>${p.label}</span>
-          </label>`
-            )
-            .join("")}
+        <div class="photo-seg photo-seg-2" role="radiogroup" aria-label="Photo kit mode">
+          <label class="photo-seg-item">
+            <input type="radio" name="photo-mode" value="listing" checked />
+            <span>Listing square</span>
+          </label>
+          <label class="photo-seg-item">
+            <input type="radio" name="photo-mode" value="shipping" />
+            <span>Shipping variants</span>
+          </label>
         </div>
-        <p id="photo-hint" class="muted tiny">${PRESETS.both.hint}</p>
-        <label class="check photo-white">
-          <input id="photo-white" type="checkbox" checked />
-          <span>White background (pad on a square)</span>
-        </label>
+        <p id="photo-mode-hint" class="sku-hint">Resize to a square, compress, strip EXIF. Optional white canvas pads the photo — it does not cut out an existing background.</p>
+        <div id="photo-listing-opts">
+          <div class="photo-seg" role="radiogroup" aria-label="Marketplace size">
+            ${Object.values(PRESETS)
+              .map(
+                (p, i) => `<label class="photo-seg-item">
+              <input type="radio" name="photo-preset" value="${p.id}" ${i === 2 ? "checked" : ""} />
+              <span>${p.label}</span>
+            </label>`
+              )
+              .join("")}
+          </div>
+          <p id="photo-hint" class="muted tiny">${PRESETS.both.hint}</p>
+          <label class="check photo-white">
+            <input id="photo-white" type="checkbox" checked />
+            <span>White background (pad on a square)</span>
+          </label>
+        </div>
+        <p id="photo-ship-hint" class="muted tiny hidden">29 Meesho 1080×1080 layouts per photo (how large the product sits in the square, plus a few borders). Upload them on Add Product and compare Meesho’s shipping quote yourself. List Pilot does not log in or read the rupee amount. No fake sale tags.</p>
       </section>
       <label class="photo-drop" id="photo-drop">
         <input id="photo-files" type="file" accept="image/jpeg,image/png,image/webp,image/bmp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.bmp" multiple hidden />
-        <strong>Drop photos here</strong>
-        <span class="muted tiny">or click to choose · JPG, PNG, WebP</span>
+        <strong id="photo-drop-title">Drop photos here</strong>
+        <span id="photo-drop-sub" class="muted tiny">or click to choose · JPG, PNG, WebP</span>
       </label>
       ${compact ? `<button id="photo-open-tab" class="btn-ghost" type="button">Open in a larger window</button>` : ""}
       <div class="label-row">
@@ -332,7 +450,32 @@
     const zipBtn = root.querySelector("#photo-download-all");
     const statusEl = root.querySelector("#photo-status");
     const hint = root.querySelector("#photo-hint");
+    const listingOpts = root.querySelector("#photo-listing-opts");
+    const shipHint = root.querySelector("#photo-ship-hint");
+    const modeHint = root.querySelector("#photo-mode-hint");
+    const dropTitle = root.querySelector("#photo-drop-title");
+    const dropSub = root.querySelector("#photo-drop-sub");
     let results = [];
+    let shipMode = false;
+
+    function isShipMode() {
+      return root.querySelector('input[name="photo-mode"]:checked')?.value === "shipping";
+    }
+
+    function syncMode() {
+      shipMode = isShipMode();
+      listingOpts.classList.toggle("hidden", shipMode);
+      shipHint.classList.toggle("hidden", !shipMode);
+      root.querySelector("#photo-list").classList.toggle("photo-list-ship", shipMode);
+      modeHint.textContent = shipMode
+        ? "Makes several white-canvas layouts from one product photo. You still compare shipping on the Meesho listing page."
+        : "Resize to a square, compress, strip EXIF. Optional white canvas pads the photo — it does not cut out an existing background.";
+      dropTitle.textContent = shipMode ? "Drop 1–3 product photos" : "Drop photos here";
+      dropSub.textContent = shipMode
+        ? "Meesho 1080×1080 variants · JPG, PNG, WebP"
+        : "or click to choose · JPG, PNG, WebP";
+      zipBtn.textContent = shipMode ? "Download variants zip" : "Download zip";
+    }
 
     function setStatus(text, bad) {
       statusEl.textContent = text || "";
@@ -351,6 +494,16 @@
         hint.textContent = p.hint;
       });
     });
+    root.querySelectorAll('input[name="photo-mode"]').forEach((el) => {
+      el.addEventListener("change", () => {
+        syncMode();
+        results.forEach((r) => r.previewUrl && URL.revokeObjectURL(r.previewUrl));
+        results = [];
+        paintResults();
+        setStatus("");
+      });
+    });
+    syncMode();
 
     async function run(fileList) {
       const incoming = [...fileList].filter((f) => /^image\//.test(f.type) || /\.(jpe?g|png|webp|bmp|heic|heif)$/i.test(f.name));
@@ -358,11 +511,38 @@
         setStatus("Choose JPG, PNG, or WebP photos.", true);
         return;
       }
+      if (isShipMode() && incoming.length > 3) incoming.length = 3;
       results.forEach((r) => r.previewUrl && URL.revokeObjectURL(r.previewUrl));
       results = [];
       paintResults();
       setStatus(`Working… 0/${incoming.length}`);
       const used = new Set();
+      if (isShipMode()) {
+        for (let i = 0; i < incoming.length; i++) {
+          setStatus(`Shipping layouts… ${i + 1}/${incoming.length}`);
+          try {
+            const batch = await processShippingFile(incoming[i], used);
+            results.push(...batch);
+            paintResults();
+          } catch (err) {
+            results.push({
+              error: true,
+              name: incoming[i].name,
+              warn: [err.message || "Could not process"],
+              blob: null
+            });
+            paintResults();
+          }
+        }
+        const ok = results.filter((r) => r.blob).length;
+        setStatus(
+          ok
+            ? `${ok} shipping layouts. Download the zip, upload on Meesho Add Product, and compare the shipping quote there.`
+            : "Nothing processed.",
+          !ok
+        );
+        return;
+      }
       const opts = optionsFrom(root);
       for (let i = 0; i < incoming.length; i++) {
         setStatus(`Working… ${i + 1}/${incoming.length}`);
@@ -417,6 +597,12 @@
       for (const item of ok) {
         entries.push({ name: uniqueName(item.name, used), data: await blobToU8(item.blob) });
       }
+      if (shipMode || results.some((r) => r.layoutId)) {
+        entries.unshift({ name: "HOW-TO-COMPARE.txt", data: new TextEncoder().encode(SHIP_NOTE) });
+        const zip = zipStore(entries);
+        downloadBlob(new Blob([zip], { type: "application/zip" }), "list-pilot-shipping-variants.zip");
+        return;
+      }
       const zip = zipStore(entries);
       downloadBlob(new Blob([zip], { type: "application/zip" }), "list-pilot-photos.zip");
     });
@@ -429,5 +615,5 @@
     }
   }
 
-  window.LFPhotos = { PRESETS, processFile, zipStore, mount };
+  window.LFPhotos = { PRESETS, processFile, processShippingFile, shippingLayouts, zipStore, mount };
 })();

@@ -1,4 +1,4 @@
-List Pilot v1.8.0 — install on Chrome (Windows, Mac, Linux)
+List Pilot v1.8.1 — install on Chrome (Windows, Mac, Linux)
 
 1. Unzip this folder.
 2. Open Chrome and go to: chrome://extensions
@@ -15,7 +15,7 @@ Then Save variant. Autofill on the next listing. You still submit the catalog yo
 List Pilot never clicks Send to QC / Submit.
 
 Add-ons (Account tab, off until you enable them):
-- Listing photo kit → Photos tab. Drop shots → Meesho 1080 / Flipkart 1500 / Both. Compress, strip EXIF, optional white square.
+- Listing photo kit → Photos tab. Listing square (Meesho 1080 / Flipkart 1500 / Both) or Shipping variants (29 Meesho layouts). Compare shipping on the listing page yourself.
 - Meesho P&L → P&L tab. Upload month orders CSV, that month’s Payments to Date zip (do not unzip), then next month’s zip. Enter SKU product + pack cost. Files stay in the browser.
 
 Trial is 5 days and works even if the license server is asleep.

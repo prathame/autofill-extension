@@ -21,8 +21,16 @@ body.photos-page .photo-list {
   grid-template-columns: 1fr 1fr;
 }
 
+body.photos-page .photo-list-ship {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
 @media (max-width: 640px) {
   body.photos-page .photo-list {
     grid-template-columns: 1fr;
+  }
+
+  body.photos-page .photo-list-ship {
+    grid-template-columns: 1fr 1fr;
   }
 }

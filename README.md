@@ -21,7 +21,10 @@ Both are **off until you enable them** in the popup **Account** tab. That keeps 
 
 ### Photo kit
 
-Turn on **Listing photo kit**. Popup → **Photos** (or `photos.html`). Pick Meesho (1080×1080), Flipkart (1500×1500), or Both. Drop JPG/PNG/WebP. List Pilot redraws on a canvas so EXIF is stripped, compresses JPEG under the size cap, and can pad onto a white square. It does **not** cut a busy background off the product.
+Turn on **Listing photo kit**. Popup → **Photos** (or `photos.html`).
+
+- **Listing square:** Meesho (1080×1080), Flipkart (1500×1500), or Both. Drop JPG/PNG/WebP. List Pilot redraws on a canvas so EXIF is stripped, compresses JPEG under the size cap, and can pad onto a white square. It does **not** cut a busy background off the product.
+- **Shipping variants:** 29 Meesho 1080×1080 layouts per photo (product size in the frame, a few borders). Download the zip, upload each on Add Product, and compare the shipping quote Meesho shows. List Pilot does **not** log into Meesho or read the rupee amount. It does not add sale tags or icons.
 
 ### Meesho P&L report
 
