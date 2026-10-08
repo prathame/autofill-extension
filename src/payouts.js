@@ -570,9 +570,45 @@
       payNextFile = f;
     });
 
+    function share(n, base) {
+      if (!base) return "0%";
+      return ((Math.abs(n) / Math.abs(base)) * 100).toFixed(1) + "%";
+    }
+
+    function barRow(label, n, total, tone) {
+      const pct = total ? (n / total) * 100 : 0;
+      return `<div class="pnl-bar-row">
+        <div class="pnl-bar-meta"><span>${LFPnl.esc(label)}</span><strong>${n.toLocaleString("en-IN")} · ${pct.toFixed(1)}%</strong></div>
+        <div class="pnl-bar"><i class="${tone || ""}" style="width:${Math.min(100, Math.max(0, pct))}%"></i></div>
+      </div>`;
+    }
+
+    function skuTable(rows, kind) {
+      const max = Math.max(...rows.map((s) => Math.abs(s.net)), 1);
+      return `<div class="pnl-scroll"><table class="pnl-table pnl-table-wide">
+        <thead><tr><th>SKU</th><th>Action</th><th>Payout</th><th>Qty</th><th>Net / margin</th><th>Return %</th></tr></thead>
+        <tbody>${rows
+          .map((s) => {
+            const w = (Math.abs(s.net) / max) * 100;
+            return `<tr>
+              <td><strong>${LFPnl.esc(s.sku || "—")}</strong>${s.catalogId ? `<div class="muted tiny">Catalog ${LFPnl.esc(s.catalogId)}</div>` : ""}</td>
+              <td><span class="pnl-pill ${kind}">${LFPnl.esc(s.action)}</span></td>
+              <td>${R(s.paid)}</td>
+              <td>${s.qty}</td>
+              <td>
+                <div class="pnl-mini-bar"><i class="${kind}" style="width:${w}%"></i></div>
+                ${R(s.net)} · ${LFPnl.pct(s.margin)}
+              </td>
+              <td>${LFPnl.pct(s.retPct)}</td>
+            </tr>`;
+          })
+          .join("") || `<tr><td colspan="6" class="muted tiny">None in this band.</td></tr>`}
+        </tbody></table></div>`;
+    }
+
     function costTable(rep, costs) {
       const rows = rep.skus
-        .slice(0, compact ? 12 : 80)
+        .slice(0, compact ? 12 : 200)
         .map(
           (s) => `<tr>
           <td>${LFPnl.esc(s.sku || "—")}</td>
@@ -583,72 +619,44 @@
         </tr>`
         )
         .join("");
-      return `<section class="card">
+      return `<section class="card pnl-sec" id="pnl-costs">
         <p class="section-label">SKU product &amp; pack cost</p>
-        <p class="muted tiny">Profit is listed price settlement minus these costs, ads and GST. Empty cost makes profit look too high.</p>
-        <div class="pay-rows" style="overflow:auto">
+        <p class="muted tiny">Settlement minus these costs, ads and GST. Empty product cost makes profit look too high.</p>
+        <div class="pnl-scroll">
           <table class="pnl-table"><thead><tr><th>SKU</th><th>Rows</th><th>Product ₹</th><th>Pack ₹</th><th>Net now</th></tr></thead><tbody>${rows}</tbody></table>
         </div>
         <button id="pnl-save-costs" class="btn-mini" type="button">Save costs &amp; rebuild</button>
       </section>`;
     }
 
-    function paint(rep, costs) {
-      const st = rep.statusN;
-      lastReport = rep;
-      out.innerHTML = `
-        <div class="pay-kpis">
-          <div><span>Net profit</span><strong>${R(rep.profitAfterGst)}</strong></div>
-          <div><span>Payout</span><strong>${R(rep.payout)}</strong></div>
-          <div><span>Loss SKUs</span><strong>${rep.lossSkus.length}</strong></div>
-          <div><span>RTO rows</span><strong>${st.rto || 0}</strong></div>
-        </div>
-        <p class="muted tiny">Margin ${LFPnl.pct(rep.margin)} · ${rep.netOrders} net orders (cancelled excluded) · ads ${R(rep.ads)}${rep.pendingCost.length ? ` · ${rep.pendingCost.length} SKUs still need a product cost` : ""}.</p>
-        <section class="card">
-          <p class="section-label">Month bridge</p>
-          <div class="kv"><span>Listed order value</span><strong>${R(rep.listed)}</strong></div>
-          <div class="kv"><span>Meesho settlement (this + next file)</span><strong>${R(rep.payout)}</strong></div>
-          <div class="kv"><span>Ads (Ads Cost sheet)</span><strong>${R(-rep.ads)}</strong></div>
-          <div class="kv"><span>Product cost</span><strong>${R(-rep.productCost)}</strong></div>
-          <div class="kv"><span>Pack cost</span><strong>${R(-rep.packCost)}</strong></div>
-          <div class="kv"><span>Recovery / referral sheets</span><strong>${R(rep.recovery + rep.referral)}</strong></div>
-          <div class="kv"><span>Profit before GST</span><strong>${R(rep.profitBeforeGst)}</strong></div>
-          <div class="kv"><span>Output GST (in settlement)</span><strong>${R(-rep.outputGst)}</strong></div>
-          <div class="kv"><span>ITC product / ads / pack</span><strong>${R(rep.productItc + rep.adsItc + rep.packItc)}</strong></div>
-          <div class="kv"><span>Net GST (output − ITC)</span><strong>${R(rep.netGst)}</strong></div>
-          <div class="kv"><span>Profit after GST</span><strong>${R(rep.profitAfterGst)}</strong></div>
-        </section>
-        <section class="card">
-          <p class="section-label">Order status</p>
-          <p class="muted tiny">Delivered ${st.delivered || 0} · RTO ${st.rto || 0} · Return ${st.return || 0} · Cancelled ${st.cancelled || 0} · Exchange ${st.exchange || 0} · Shipped ${st.shipped || 0}</p>
-          <p class="muted tiny">Delivered not in these payout files: ${rep.deliveredUnpaid.length} (${R(rep.deliveredUnpaid.reduce((s, l) => s + l.listed, 0))} listed). Cancelled without payout: ${rep.cancelledUnpaid.length} (expected). Prior-period payout IDs not in this order month: ${rep.extra.length} (${R(rep.extraPaid)}).</p>
-        </section>
-        ${costTable(rep, costs)}
-        <section class="card">
-          <p class="section-label">Action plan</p>
-          ${rep.actions
-            .map(
-              (a) =>
-                `<div class="pay-row"><span>#${a.rank || "★"} ${LFPnl.esc(a.sku)}</span><span>${LFPnl.esc(a.action)}</span><span>${R(a.net)}</span></div>`
-            )
-            .join("") || `<p class="muted tiny">Add SKU costs to rank scale vs stop.</p>`}
-        </section>
-        <section class="card">
-          <p class="section-label">SKU ranking</p>
-          ${rep.skus
-            .slice(0, compact ? 8 : 25)
-            .map(
-              (s) =>
-                `<div class="pay-row"><span>${LFPnl.esc(s.sku || "—")}</span><span>${LFPnl.esc(s.action)}</span><span>${R(s.net)} · ${LFPnl.pct(s.margin)}</span></div>`
-            )
-            .join("")}
-        </section>
-        <button id="pay-download" class="btn-mini" type="button">Download P&amp;L CSV</button>
-      `;
+    function bindReport(rep, costs) {
       out.querySelector("#pay-download")?.addEventListener("click", async () => {
         if (!(await gate())) return;
         downloadText("list-pilot-pnl.csv", LFPnl.reportCsv(rep), "text/csv");
       });
+      out.querySelector("#pay-pdf")?.addEventListener("click", async () => {
+        if (!(await gate())) return;
+        document.body.classList.add("pnl-printing");
+        window.print();
+        setTimeout(() => document.body.classList.remove("pnl-printing"), 400);
+      });
+      out.querySelectorAll(".pnl-toc a").forEach((a) => {
+        a.addEventListener("click", (e) => {
+          e.preventDefault();
+          const el = out.querySelector(a.getAttribute("href"));
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
+      const search = out.querySelector("#pnl-order-q");
+      const tbody = out.querySelector("#pnl-order-body");
+      if (search && tbody) {
+        search.addEventListener("input", () => {
+          const q = search.value.trim().toLowerCase();
+          tbody.querySelectorAll("tr").forEach((tr) => {
+            tr.classList.toggle("hidden", q && !tr.textContent.toLowerCase().includes(q));
+          });
+        });
+      }
       out.querySelector("#pnl-save-costs")?.addEventListener("click", async () => {
         const next = { ...costs };
         out.querySelectorAll(".pnl-cost").forEach((el) => {
@@ -664,6 +672,235 @@
         paint(rebuilt, next);
         setStatus("Costs saved. Profit uses product + pack on non-cancelled rows.");
       });
+    }
+
+    function paint(rep, costs) {
+      const st = rep.statusN;
+      lastReport = rep;
+      const deliveredPct = Math.round(rep.deliveredPct || 0);
+      const winner = rep.profitSkus[0];
+      const loser = rep.lossSkus[rep.lossSkus.length - 1] ? [...rep.lossSkus].sort((a, b) => a.net - b.net)[0] : null;
+      const splitBase = Math.abs(rep.payout) || 1;
+      const topStates = (rep.states || []).slice(0, 8);
+      const maxDay = Math.max(...(rep.days || []).map((d) => d.paid), 1);
+      const orderRows = (rep.lines || []).slice(0, compact ? 0 : 200);
+
+      if (compact) {
+        out.innerHTML = `
+          <div class="pnl-hero pnl-hero-sm">
+            <div>
+              <span class="pnl-k">Net profit</span>
+              <strong class="pnl-big">${R(rep.profitAfterGst)}</strong>
+              <p class="muted tiny">${LFPnl.pct(rep.margin)} margin · ${R(rep.avgPerOrder)} avg/order · ${rep.skus.length} SKUs</p>
+            </div>
+            <div class="pay-kpis">
+              <div><span>Payout</span><strong>${R(rep.payout)}</strong></div>
+              <div><span>Net orders</span><strong>${rep.netOrders}</strong></div>
+              <div><span>Loss SKUs</span><strong>${rep.lossSkus.length}</strong></div>
+              <div><span>RTO</span><strong>${st.rto || 0}</strong></div>
+            </div>
+          </div>
+          <p class="muted tiny">${rep.pendingCost.length ? `${rep.pendingCost.length} SKUs still need a product cost. ` : ""}Open the large window for the full report, GST, ranking and PDF.</p>
+          ${costTable(rep, costs)}
+          <div class="row-end pnl-print-hide">
+            <button id="pay-download" class="btn-mini" type="button">Download CSV</button>
+          </div>`;
+        bindReport(rep, costs);
+        return;
+      }
+
+      out.innerHTML = `
+        <article class="pnl-report" id="pnl-report">
+          <header class="pnl-hero">
+            <div class="pnl-hero-main">
+              <span class="pnl-k">Net profit</span>
+              <strong class="pnl-big">${R(rep.profitAfterGst)}</strong>
+              <div class="pnl-chips">
+                <span>${LFPnl.pct(rep.margin)} margin</span>
+                <span>${R(rep.avgPerOrder)} avg/order</span>
+                <span>${rep.skus.length} SKUs analysed</span>
+              </div>
+              <div class="pnl-hero-stats">
+                <div><span>Total payout</span><strong>${R(rep.payout)}</strong></div>
+                <div><span>Net orders</span><strong>${rep.netOrders.toLocaleString("en-IN")}</strong></div>
+                <div><span>Loss SKUs</span><strong>${rep.lossSkus.length}</strong></div>
+              </div>
+            </div>
+            <div class="pnl-donut" style="background:conic-gradient(var(--accent) 0 ${deliveredPct}%, var(--subtle) ${deliveredPct}% 100%)">
+              <span>${deliveredPct}%<small>delivered</small></span>
+            </div>
+            <p class="pnl-donut-meta">${rep.orders.toLocaleString("en-IN")} total · ${(st.delivered || 0).toLocaleString("en-IN")} delivered rows</p>
+          </header>
+
+          <nav class="pnl-toc pnl-print-hide" aria-label="Report sections">
+            <a href="#pnl-mix">SKU mix</a>
+            <a href="#pnl-split">Cost split</a>
+            <a href="#pnl-status">Status</a>
+            <a href="#pnl-actions">Actions</a>
+            <a href="#pnl-gst">GST</a>
+            <a href="#pnl-trend">Trend</a>
+            <a href="#pnl-rank">SKU ranking</a>
+            <a href="#pnl-costs">Costs</a>
+            <a href="#pnl-orders">Orders</a>
+            <a href="#pnl-export">Export</a>
+          </nav>
+
+          <section class="card pnl-sec" id="pnl-mix">
+            <p class="section-label">SKU count summary</p>
+            <p class="muted tiny">Unique SKU codes in this month. Cost rows can be more if you track sizes separately.</p>
+            <div class="pnl-stat-grid">
+              <div><span>Total unique SKUs</span><strong>${rep.skus.length}</strong></div>
+              <div><span>Profit SKUs</span><strong>${rep.profitSkus.length}</strong></div>
+              <div><span>Loss SKUs</span><strong>${rep.lossSkus.length}</strong></div>
+              <div><span>Cost pending</span><strong>${rep.pendingCost.length}</strong></div>
+            </div>
+          </section>
+
+          <section class="card pnl-sec" id="pnl-states">
+            <p class="section-label">State spread</p>
+            <p class="muted tiny">Customer State from the orders CSV. Not a live map — counts only.</p>
+            ${topStates.map((s) => barRow(s.state, s.n, rep.orders)).join("") || `<p class="muted tiny">No state column in this file.</p>`}
+          </section>
+
+          <section class="card pnl-sec" id="pnl-split">
+            <p class="section-label">Revenue split</p>
+            <p class="muted tiny">How this month’s payout breaks into costs, ads, GST and the result. Percents are of payout, not a perfect pie.</p>
+            <div class="pnl-split">
+              <div><span>Net profit</span><strong>${R(rep.profitAfterGst)}</strong><em>${share(rep.profitAfterGst, splitBase)}</em></div>
+              <div><span>Product cost</span><strong>${R(rep.productCost)}</strong><em>${share(rep.productCost, splitBase)}</em></div>
+              <div><span>Packaging</span><strong>${R(rep.packCost)}</strong><em>${share(rep.packCost, splitBase)}</em></div>
+              <div><span>Ads cost</span><strong>${R(rep.ads)}</strong><em>${share(rep.ads, splitBase)}</em></div>
+              <div><span>GST impact</span><strong>${R(rep.netGst)}</strong><em>${share(rep.netGst, splitBase)}</em></div>
+              <div><span>Recovery</span><strong>${R(rep.recovery + rep.referral)}</strong><em>${share(rep.recovery + rep.referral, splitBase)}</em></div>
+            </div>
+          </section>
+
+          <section class="card pnl-sec" id="pnl-status">
+            <p class="section-label">Order status</p>
+            ${barRow("Delivered", st.delivered || 0, rep.orders, "ok")}
+            ${barRow("RTO", st.rto || 0, rep.orders, "warn")}
+            ${barRow("Return", st.return || 0, rep.orders, "warn")}
+            ${barRow("Cancelled", st.cancelled || 0, rep.orders)}
+            ${barRow("Shipped", st.shipped || 0, rep.orders)}
+            ${barRow("Exchange", st.exchange || 0, rep.orders)}
+            <p class="muted tiny">Delivered not in these payout files: ${rep.deliveredUnpaid.length} (${R(rep.deliveredUnpaid.reduce((s, l) => s + l.listed, 0))} listed). Prior-period payout IDs: ${rep.extra.length} (${R(rep.extraPaid)}).</p>
+          </section>
+
+          <section class="card pnl-sec" id="pnl-actions">
+            <p class="section-label">Action plan</p>
+            <div class="pnl-callouts">
+              ${loser ? `<div><span>Fix top loss SKU</span><strong>${LFPnl.esc(loser.sku)}</strong><em>${R(loser.net)}</em></div>` : ""}
+              ${winner ? `<div><span>Protect winner SKU</span><strong>${LFPnl.esc(winner.sku)}</strong><em>${R(winner.net)}</em></div>` : ""}
+              <div><span>Profit if loss SKUs were fixed</span><strong>${R(rep.improvement)}</strong><em>${rep.lossSkus.length} loss SKUs</em></div>
+            </div>
+            <div class="pnl-scroll"><table class="pnl-table pnl-table-wide">
+              <thead><tr><th>#</th><th>SKU</th><th>Action</th><th>Net</th><th>Margin</th><th>Return %</th><th>Why</th></tr></thead>
+              <tbody>${(rep.actions || [])
+                .map(
+                  (a) => `<tr>
+                  <td>${a.rank || "★"}</td>
+                  <td>${LFPnl.esc(a.sku)}</td>
+                  <td>${LFPnl.esc(a.action)}</td>
+                  <td>${R(a.net)}</td>
+                  <td>${LFPnl.pct(a.margin)}</td>
+                  <td>${LFPnl.pct(a.retPct)}</td>
+                  <td class="muted tiny">${LFPnl.esc(a.why || "")}</td>
+                </tr>`
+                )
+                .join("") || `<tr><td colspan="7" class="muted tiny">Add SKU costs to rank scale vs stop.</td></tr>`}
+              </tbody></table></div>
+          </section>
+
+          <section class="card pnl-sec" id="pnl-summary">
+            <p class="section-label">Monthly summary</p>
+            <div class="kv"><span>Gross orders</span><strong>${rep.orders.toLocaleString("en-IN")}</strong></div>
+            <div class="kv"><span>Cancelled / net orders</span><strong>${st.cancelled || 0} / ${rep.netOrders.toLocaleString("en-IN")}</strong></div>
+            <div class="kv"><span>RTO %</span><strong>${LFPnl.pct(rep.rtoPct)} · ${st.rto || 0} rows</strong></div>
+            <div class="kv"><span>Customer return %</span><strong>${LFPnl.pct(rep.returnPct)} · ${st.return || 0} rows</strong></div>
+            <div class="kv"><span>Total payout</span><strong>${R(rep.payout)}</strong></div>
+            <div class="kv"><span>Misc cost</span><strong>${R(rep.misc)}</strong></div>
+            <div class="kv"><span>Product cost</span><strong>${R(rep.productCost)}</strong></div>
+            <div class="kv"><span>Pack cost</span><strong>${R(rep.packCost)}</strong></div>
+            <div class="kv"><span>Ads total</span><strong>${R(rep.ads)}</strong></div>
+            <div class="kv"><span>Recovery / referral</span><strong>${R(rep.recovery + rep.referral)}</strong></div>
+            <div class="kv"><span>Profit before GST</span><strong>${R(rep.profitBeforeGst)}</strong></div>
+            <div class="kv"><span>Profit after GST</span><strong>${R(rep.profitAfterGst)}</strong></div>
+            <p class="muted tiny">− GST ${R(rep.outputGst)} · + product ITC ${R(rep.productItc)} · + ads ITC ${R(rep.adsItc)} · + pack ITC ${R(rep.packItc)}</p>
+          </section>
+
+          <section class="card pnl-sec" id="pnl-gst">
+            <p class="section-label">GST breakdown</p>
+            <div class="kv"><span>Output GST (in settlement)</span><strong>${R(-rep.outputGst)}</strong></div>
+            <div class="kv"><span>Product ITC</span><strong>${R(rep.productItc)}</strong></div>
+            <div class="kv"><span>Ads ITC</span><strong>${R(rep.adsItc)}</strong></div>
+            <div class="kv"><span>Pack ITC</span><strong>${R(rep.packItc)}</strong></div>
+            <div class="kv"><span>Net GST</span><strong>${R(rep.netGst)}</strong></div>
+            <p class="muted tiny">This is a working estimate from the files, not a GST return.</p>
+          </section>
+
+          <section class="card pnl-sec" id="pnl-trend">
+            <p class="section-label">Daily trend</p>
+            <p class="muted tiny">Ads, recovery, referral and misc are allocated by that day’s share of payout.</p>
+            <div class="pnl-days">
+              ${(rep.days || [])
+                .map(
+                  (d) => `<div class="pnl-day" title="${d.date} ${R(d.paid)}">
+                    <i style="height:${Math.max(4, (d.paid / maxDay) * 72)}px"></i>
+                    <span>${d.date.slice(8)}</span>
+                  </div>`
+                )
+                .join("") || `<p class="muted tiny">No order dates in this file.</p>`}
+            </div>
+          </section>
+
+          <section class="card pnl-sec" id="pnl-rank">
+            <p class="section-label">SKU profitability ranking</p>
+            <div class="pnl-stat-grid">
+              <div><span>Total SKUs</span><strong>${rep.skus.length}</strong></div>
+              <div><span>Profit SKUs</span><strong>${rep.profitSkus.length}</strong></div>
+              <div><span>Loss SKUs</span><strong>${rep.lossSkus.length}</strong></div>
+              <div><span>Near zero</span><strong>${(rep.nearZero || []).length}</strong></div>
+            </div>
+            <h3 class="pnl-h">Top profit SKUs</h3>
+            ${skuTable(rep.profitSkus.slice(0, 10), "ok")}
+            <h3 class="pnl-h">Top loss SKUs</h3>
+            ${skuTable([...rep.lossSkus].sort((a, b) => a.net - b.net).slice(0, 10), "bad")}
+          </section>
+
+          ${costTable(rep, costs)}
+
+          <section class="card pnl-sec" id="pnl-orders">
+            <p class="section-label">Order-wise preview</p>
+            <input id="pnl-order-q" class="input pnl-print-hide" type="search" placeholder="Search SKU, product, or sub order" />
+            <div class="pnl-scroll"><table class="pnl-table pnl-table-wide">
+              <thead><tr><th>Sub order</th><th>SKU</th><th>Product</th><th>Qty</th><th>Status</th><th>GST</th><th>Paid</th></tr></thead>
+              <tbody id="pnl-order-body">${orderRows
+                .map(
+                  (l) => `<tr>
+                  <td class="mono">${LFPnl.esc(l.id)}</td>
+                  <td>${LFPnl.esc(l.sku)}</td>
+                  <td>${LFPnl.esc((l.productName || "").slice(0, 72))}</td>
+                  <td>${l.qty}</td>
+                  <td>${LFPnl.esc(l.statusRaw)}</td>
+                  <td>${l.gst}%</td>
+                  <td>${R(l.paid)}</td>
+                </tr>`
+                )
+                .join("")}</tbody>
+            </table></div>
+            <p class="muted tiny">Showing ${orderRows.length} of ${rep.lines.length} unique sub-orders. Full set is in the CSV.</p>
+          </section>
+
+          <section class="card pnl-sec pnl-print-hide" id="pnl-export">
+            <p class="section-label">Export</p>
+            <p class="muted tiny">PDF opens Chrome’s print dialog — choose Save as PDF. Files never leave this computer.</p>
+            <div class="row-end">
+              <button id="pay-pdf" class="btn-glow" type="button">Download PDF</button>
+              <button id="pay-download" class="btn-mini" type="button">Download CSV</button>
+            </div>
+          </section>
+        </article>`;
+      bindReport(rep, costs);
     }
 
     root.querySelector("#pay-run").addEventListener("click", async () => {

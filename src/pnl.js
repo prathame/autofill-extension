@@ -46,6 +46,15 @@
     return "other";
   }
 
+  function dayKey(v) {
+    const s = String(v || "").trim();
+    let m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    m = s.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+    if (m) return `${m[3]}-${String(m[2]).padStart(2, "0")}-${String(m[1]).padStart(2, "0")}`;
+    return "";
+  }
+
   function pick(row, names) {
     for (const n of names) {
       if (row[n] != null && String(row[n]).trim() !== "") return row[n];
@@ -364,7 +373,10 @@
         statusRaw,
         group: statusGroup(statusRaw),
         productName: pick(r, ["Product Name"]),
-        date: pick(r, ["Order Date"])
+        date: pick(r, ["Order Date"]),
+        state: String(pick(r, ["Customer State", "State"]) || "").trim(),
+        catalogId: String(pick(r, ["Catalog ID", "Catalog Id"]) || "").trim(),
+        size: String(pick(r, ["Size"]) || "").trim()
       });
     }
 
@@ -401,13 +413,29 @@
       statusN[o.group] = (statusN[o.group] || 0) + 1;
       const line = { ...o, paid, productCost: pc, packCost: pk, inPayout: !!p, payStatus: p ? p.status : "", payRows: p ? p.rows : 0 };
       lines.push(line);
-      const s = skuMap.get(o.sku) || { sku: o.sku, qty: 0, listed: 0, paid: 0, productCost: 0, packCost: 0, n: 0, rto: 0, ret: 0, delivered: 0, cancelled: 0 };
+      const s = skuMap.get(o.sku) || {
+        sku: o.sku,
+        qty: 0,
+        listed: 0,
+        paid: 0,
+        productCost: 0,
+        packCost: 0,
+        n: 0,
+        rto: 0,
+        ret: 0,
+        delivered: 0,
+        cancelled: 0,
+        catalogId: o.catalogId,
+        productName: o.productName
+      };
       s.qty += o.qty;
       s.listed += o.listed;
       s.paid += paid;
       s.productCost += pc;
       s.packCost += pk;
       s.n += 1;
+      if (!s.catalogId) s.catalogId = o.catalogId;
+      if (!s.productName) s.productName = o.productName;
       if (o.group === "rto") s.rto += 1;
       if (o.group === "return") s.ret += 1;
       if (o.group === "delivered") s.delivered += 1;
@@ -441,7 +469,73 @@
     skus.sort((a, b) => b.net - a.net);
     const profitSkus = skus.filter((s) => s.net > 1);
     const lossSkus = skus.filter((s) => s.net < -1);
+    const nearZero = skus.filter((s) => Math.abs(s.net) <= 1);
     const pendingCost = skus.filter((s) => !((costs[s.sku] || {}).product > 0));
+    const rtoPct = netOrders ? ((statusN.rto || 0) / netOrders) * 100 : 0;
+    const returnPct = netOrders ? ((statusN.return || 0) / netOrders) * 100 : 0;
+    const deliveredPct = orders.length ? ((statusN.delivered || 0) / orders.length) * 100 : 0;
+    const avgPerOrder = netOrders ? profitAfterGst / netOrders : 0;
+
+    const stateMap = new Map();
+    for (const l of lines) {
+      const stt = l.state || "Unknown";
+      const row = stateMap.get(stt) || { state: stt, n: 0, delivered: 0, rto: 0, ret: 0, cancelled: 0 };
+      row.n += 1;
+      if (l.group === "delivered") row.delivered += 1;
+      if (l.group === "rto") row.rto += 1;
+      if (l.group === "return") row.ret += 1;
+      if (l.group === "cancelled") row.cancelled += 1;
+      stateMap.set(stt, row);
+    }
+    const states = [...stateMap.values()].sort((a, b) => b.n - a.n);
+
+    const dayMap = new Map();
+    for (const l of lines) {
+      const k = dayKey(l.date) || "unknown";
+      const d = dayMap.get(k) || {
+        date: k,
+        n: 0,
+        qty: 0,
+        paid: 0,
+        listed: 0,
+        productCost: 0,
+        packCost: 0,
+        delivered: 0,
+        rto: 0,
+        ret: 0,
+        cancelled: 0,
+        exchange: 0
+      };
+      d.n += 1;
+      d.qty += l.qty;
+      d.paid += l.paid;
+      d.listed += l.listed;
+      d.productCost += l.productCost;
+      d.packCost += l.packCost;
+      if (l.group === "delivered") d.delivered += 1;
+      if (l.group === "rto") d.rto += 1;
+      if (l.group === "return") d.ret += 1;
+      if (l.group === "cancelled") d.cancelled += 1;
+      if (l.group === "exchange") d.exchange += 1;
+      dayMap.set(k, d);
+    }
+    const days = [...dayMap.values()]
+      .filter((d) => d.date !== "unknown")
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((d) => {
+        const share = payout ? d.paid / payout : 0;
+        const adsA = ads * share;
+        const recA = recovery * share;
+        const refA = referral * share;
+        const miscA = misc * share;
+        const pbt = d.paid + recA + refA - adsA - d.productCost - d.packCost - miscA;
+        const outG = outputGst * share;
+        const pItc = productItc * share;
+        const aItc = adsItc * share;
+        const kItc = packItc * share;
+        const net = pbt - outG + pItc + aItc + kItc;
+        return { ...d, share, ads: adsA, recovery: recA, referral: refA, misc: miscA, profitBeforeGst: pbt, profitAfterGst: net };
+      });
 
     const deliveredUnpaid = lines.filter((l) => l.group === "delivered" && !l.inPayout);
     const cancelledUnpaid = lines.filter((l) => l.group === "cancelled" && !l.inPayout);
@@ -495,12 +589,20 @@
       skus,
       profitSkus,
       lossSkus,
+      nearZero,
       pendingCost,
       deliveredUnpaid,
       cancelledUnpaid,
       rtoUnpaid,
       actions,
-      lines
+      lines,
+      states,
+      days,
+      rtoPct,
+      returnPct,
+      deliveredPct,
+      avgPerOrder,
+      improvement: lossSkus.reduce((s, x) => s + Math.abs(x.net), 0)
     };
   }
 

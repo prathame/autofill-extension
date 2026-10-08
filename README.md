@@ -36,7 +36,7 @@ Turn on **Meesho P&L report**. Popup → **P&L** (or `payouts.html`). Upload thr
 
 Then enter **product + packaging cost per SKU**. Profit is settlement + recovery + referral − ads − product − pack − misc, then output GST and ITC. Listed price and GMV are not profit. Cancelled rows are excluded from net orders. Exchange rows count pack cost twice.
 
-Trial can build the report; after trial, CSV export needs Pro. This is not GST filing and it does not log into the seller panel.
+Open **Open in a larger window** for the full report (hero, SKU mix, state spread, cost split, status, action plan, GST, daily trend, SKU ranking, order table). **Download PDF** uses Chrome’s print dialog → Save as PDF. Trial can build the report; after trial, CSV/PDF export needs Pro. This is not GST filing and it does not log into the seller panel.
 
 ## Free install + paid subscription
 
